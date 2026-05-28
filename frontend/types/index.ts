@@ -88,7 +88,7 @@ export type QuizType =
 
 export interface QuizQuestion {
   id: string
-  type: QuizType
+  type: string
   hanzi: string
   pinyin: string
   french: string
