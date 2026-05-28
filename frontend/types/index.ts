@@ -69,7 +69,7 @@ export interface VocabItem {
  */
 export interface DialogueLine {
   id: string
-  speaker: 'A' | 'B'
+  speaker: string
   hanzi: string
   pinyin: string
   french: string
