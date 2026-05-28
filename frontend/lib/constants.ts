@@ -1,12 +1,15 @@
 // lib/constants.ts
 
+
+import type { Lesson } from "@/types";
+
 export const LEVEL_META: Record<string, { label: string; subtitle: string; tag: string }> = {
   A: { label: "Initiation",    subtitle: "Premiers pas en mandarin",     tag: "Débutant" },
   B: { label: "Intermédiaire", subtitle: "Consolider les fondamentaux",  tag: "Intermédiaire" },
   C: { label: "Avancé",        subtitle: "Maîtriser la langue courante", tag: "Avancé" },
 };
 
-export const MOCK_LESSONS = [
+export const MOCK_LESSONS: Lesson[] = [
 
   /* ==========================================
      NIVEAU A — UNITÉ 1 : LES BASES
