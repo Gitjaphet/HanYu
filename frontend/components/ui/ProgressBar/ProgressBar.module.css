@@ -1,0 +1,72 @@
+/* ============================================================
+   ProgressBar.module.css — HanYu
+   ============================================================ */
+
+.wrap { width: 100%; }
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.value {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* Track */
+.track {
+  background: var(--color-border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  position: relative;
+}
+
+.sm { height: 4px; }
+.md { height: 7px; }
+.lg { height: 10px; }
+
+/* Fill */
+.fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  position: relative;
+  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animated {
+  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reflet */
+.sheen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: var(--radius-pill);
+}
+
+/* Couleurs */
+.colorPrimary {
+  background: linear-gradient(90deg, var(--color-primary), #5edac9);
+}
+
+.colorSecondary {
+  background: linear-gradient(90deg, var(--color-secondary), #f78a96);
+}
+
+.colorTertiary {
+  background: linear-gradient(90deg, var(--color-tertiary), #f8c36a);
+}

@@ -1,0 +1,99 @@
+/* ============================================================
+   Toast.module.css — HanYu
+   ============================================================ */
+
+.wrap {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  pointer-events: none;
+}
+
+/* Sur mobile, centré en bas */
+@media (max-width: 767px) {
+  .wrap {
+    right: 12px;
+    left: 12px;
+    bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ── Toast ── */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 220px;
+  max-width: 340px;
+  pointer-events: auto;
+
+  /* Entrée depuis la droite */
+  transform: translateX(calc(100% + 16px));
+  opacity: 0;
+  transition:
+    transform 0.38s var(--ease-spring),
+    opacity 0.3s ease;
+
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+}
+
+.toast.visible {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* Variantes */
+.info {
+  background: var(--color-navy);
+  color: white;
+}
+
+.success {
+  background: #0d7a67;
+  color: white;
+}
+
+.error {
+  background: var(--color-secondary);
+  color: white;
+}
+
+.xp {
+  background: linear-gradient(135deg, var(--color-tertiary), #d98a10);
+  color: white;
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.msg {
+  flex: 1;
+  line-height: 1.3;
+}
+
+.close {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.6;
+  padding: 2px;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+}
+.close:hover { opacity: 1; }

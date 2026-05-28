@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/* ── Variables manquantes ── */
+@theme {
+  /* déjà présents */
+  --color-background: #F8F9FA;
+  --color-card: #FFFFFF;
+  --color-text: #1E293B;
+  --color-text-muted: #64748B;
+  --color-primary: #FF5A36;
+  --color-secondary: #0D3B4A;
+  --color-tertiary: #2EC4A9;
+  --color-border: #E2E8F0;
+
+  /* ── AJOUTS nécessaires pour LessonCard ── */
+  --color-primary-dark: #e04420;
+  --color-navy: #0D3B4A;
+  --color-background-muted: #F1F5F9;
+
+  --radius-lg: 20px;
+  --radius-md: 12px;
+
+  --shadow-hover: 0 16px 40px rgba(13, 59, 74, 0.14);
+  --shadow-primary: 0 7px 22px rgba(255, 90, 54, 0.50);
+
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── Police hanzi ── */
+  --font-hanzi: var(--font-noto-serif-sc), serif;
+  --font-sans: var(--font-josefin-sans), sans-serif;
+}
+
+/* ── APRÈS le bloc @theme { } ── */
+
+:root {
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --radius-lg: 20px;
+  --radius-md: 12px;
+  --shadow-hover: 0 16px 40px rgba(13, 59, 74, 0.14);
+  --shadow-primary: 0 7px 22px rgba(255, 90, 54, 0.50);
+  --color-navy: #0D3B4A;
+  --font-hanzi: var(--font-noto-serif-sc), serif;
+  --font-sans: var(--font-josefin-sans), sans-serif;
+}
+
+/* Application des variables au document global */
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-josefin-sans), sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Utilitaire pour cacher les barres de défilement (scrollbars) sur les menus, tout en gardant le scroll */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+
+
+
+/* Application des variables au document global */
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-josefin-sans), sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Utilitaire pour cacher les barres de défilement (scrollbars) sur les menus, tout en gardant le scroll */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
