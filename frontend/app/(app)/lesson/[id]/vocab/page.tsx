@@ -44,6 +44,8 @@ export default function VocabPage() {
   const router  = useRouter();
   const lesson  = MOCK_LESSONS.find((l) => l.id === parseInt(params.id as string, 10));
 
+
+  const [hasStarted, setHasStarted] = useState(false);
   const [idx, setIdx]           = useState(0);
   const [micState, setMicState] = useState<MicState>("idle");
   const [attempts, setAttempts] = useState(0);
@@ -201,7 +203,7 @@ export default function VocabPage() {
 
   // ─── Séquence auto à chaque nouveau mot ──────────────────────────────────
   useEffect(() => {
-    if (!current) return;
+    if (!current || !hasStarted) return;
     hasAutoRef.current = false;
     setMicState("idle");
     setAttempts(0);
@@ -227,7 +229,8 @@ export default function VocabPage() {
       window.speechSynthesis?.cancel();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx]);
+  }, [idx, hasStarted]);
+
 
   // ─── Navigation ───────────────────────────────────────────────────────────
   const goNext = useCallback(() => {
@@ -267,6 +270,27 @@ export default function VocabPage() {
     return (
       <div className="flex items-center justify-center h-[100dvh]">
         <p className="text-text-muted font-bold">Leçon introuvable.</p>
+      </div>
+    );
+  }
+
+  // NOUVEAU : Écran de lancement obligatoire pour iOS
+  if (!hasStarted) {
+    return (
+      <div className="fixed inset-0 bg-background z-[90] flex flex-col items-center justify-center p-6 select-none">
+        <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center text-4xl mb-4 animate-bounce">
+          🎙️
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-black text-text text-center mb-2">Prêt à parler ?</h2>
+        <p className="text-sm text-text-muted text-center max-w-xs mb-8">
+          Assure-toi que le son est activé et autorise l'accès au micro.
+        </p>
+        <button
+          onClick={() => setHasStarted(true)}
+          className="w-full max-w-xs py-4 rounded-xl bg-primary text-white font-bold text-lg shadow-lg hover:scale-105 active:scale-95 transition-all"
+        >
+          Démarrer l'exercice
+        </button>
       </div>
     );
   }

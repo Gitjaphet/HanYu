@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Lock, Play, RotateCcw, Star } from "lucide-react";
 import { Lesson } from "@/types";
@@ -5,7 +8,7 @@ import styles from "./LessonCard.module.css";
 
 interface LessonCardProps {
   lesson: Lesson;
-  starsEarned?: number; /* 0 à 5 */
+  starsEarned?: number;
   lessonNumber?: number;
 }
 
@@ -24,16 +27,36 @@ const STARS_MAP: Record<number, number> = {
 };
 
 export function LessonCard({ lesson, starsEarned, lessonNumber }: LessonCardProps) {
-  const isLocked    = lesson.status === "locked";
-  const isCompleted = lesson.status === "completed";
+  // On utilise des états locaux pour pouvoir écraser MOCK_LESSONS avec le localStorage
+  const [isCompleted, setIsCompleted] = useState(lesson.status === "completed");
+  const [isLocked, setIsLocked] = useState(lesson.status === "locked");
+  const [stars, setStars] = useState(starsEarned ?? STARS_MAP[lesson.id] ?? 0);
 
-  /* starsEarned passé en prop, sinon fallback sur STARS_MAP, sinon 0 */
-  const stars = starsEarned ?? STARS_MAP[lesson.id] ?? 0;
+  useEffect(() => {
+    // 1. Vérifier si CETTE leçon a été terminée (quizDone)
+    const storedCurrent = localStorage.getItem(`lesson_progress_${lesson.id}`);
+    if (storedCurrent) {
+      const progress = JSON.parse(storedCurrent);
+      if (progress.quizDone) {
+        setIsCompleted(true);
+        setIsLocked(false);
+        if (progress.stars) setStars(progress.stars);
+      }
+    }
 
-  /* 0–3 étoiles affichées converties depuis une note sur 5 */
+    // 2. Vérifier si la leçon PRÉCÉDENTE a été terminée pour déverrouiller celle-ci
+    if (lesson.id > 1 && lesson.status === "locked") {
+      const storedPrev = localStorage.getItem(`lesson_progress_${lesson.id - 1}`);
+      if (storedPrev) {
+        const prevProgress = JSON.parse(storedPrev);
+        if (prevProgress.quizDone) {
+          setIsLocked(false);
+        }
+      }
+    }
+  }, [lesson.id, lesson.status]);
+
   const filledStars = Math.round((stars / 5) * 3);
-
-  /* Couleur dynamique : accent haut + hanzi/pinyin sur cartes locked/completed */
   const accentColor = lesson.color ?? "var(--color-primary)";
 
   return (
@@ -45,35 +68,26 @@ export function LessonCard({ lesson, starsEarned, lessonNumber }: LessonCardProp
       ]
         .filter(Boolean)
         .join(" ")}
-      aria-label={`Leçon ${lessonNumber ?? lesson.id} : ${lesson.title}`}
     >
-      {/* ── Accent couleur en haut ── */}
       <div
         className={styles.colorAccent}
         style={{ background: accentColor }}
         aria-hidden="true"
       />
 
-      {/* ── Blob décoratif coin supérieur droit ── */}
       <div
         className={styles.blob}
-        style={{
-          background: `radial-gradient(circle, ${accentColor}18 0%, transparent 70%)`,
-        }}
+        style={{ background: `radial-gradient(circle, ${accentColor}18 0%, transparent 70%)` }}
         aria-hidden="true"
       />
 
-      {/* ── En-tête ── */}
       <div className={styles.cardTop}>
         <span className={styles.lessonNum}>
           Leçon {lessonNumber ?? lesson.id}
         </span>
 
         {!isLocked && (
-          <div
-            className={styles.stars}
-            aria-label={`${stars} étoile${stars !== 1 ? "s" : ""} sur 5`}
-          >
+          <div className={styles.stars}>
             {[1, 2, 3].map((s) => (
               <Star
                 key={s}
@@ -82,14 +96,12 @@ export function LessonCard({ lesson, starsEarned, lessonNumber }: LessonCardProp
                   styles.star,
                   s <= filledStars ? styles.starFilled : styles.starEmpty,
                 ].join(" ")}
-                aria-hidden="true"
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* ── Caractères chinois + pinyin + traduction ── */}
       <div className={styles.cardBody}>
         <h2
           className={styles.hanzi}
@@ -99,17 +111,13 @@ export function LessonCard({ lesson, starsEarned, lessonNumber }: LessonCardProp
           {lesson.chinese}
         </h2>
 
-        <p
-          className={styles.pinyin}
-          style={isLocked || isCompleted ? { color: accentColor } : undefined}
-        >
+        <p className={styles.pinyin} style={isLocked || isCompleted ? { color: accentColor } : undefined}>
           {lesson.pinyin}
         </p>
 
         <p className={styles.title}>{lesson.title}</p>
       </div>
 
-      {/* ── Module pills ── */}
       <div className={styles.pills}>
         {lesson.modules.map((mod) => {
           const m = MODULE_MAP[mod] ?? { label: mod, cls: styles.mpWrite };
@@ -121,32 +129,20 @@ export function LessonCard({ lesson, starsEarned, lessonNumber }: LessonCardProp
         })}
       </div>
 
-      {/* ── Bouton d'action ── */}
       <div className={styles.cardFooter}>
         {isLocked ? (
-          <div
-            className={styles.btnLocked}
-            aria-label="Leçon verrouillée"
-          >
-            <Lock size={15} aria-hidden="true" />
+          <div className={styles.btnLocked}>
+            <Lock size={15} />
             <span>Verrouillé</span>
           </div>
-
         ) : isCompleted ? (
-          <Link
-            href={`/lesson/${lesson.id}`}
-            className={[styles.btn, styles.btnReview].join(" ")}
-          >
-            <RotateCcw size={15} aria-hidden="true" />
+          <Link href={`/lesson/${lesson.id}`} className={[styles.btn, styles.btnReview].join(" ")}>
+            <RotateCcw size={15} />
             <span>Réviser</span>
           </Link>
-
         ) : (
-          <Link
-            href={`/lesson/${lesson.id}`}
-            className={[styles.btn, styles.btnStart].join(" ")}
-          >
-            <Play size={15} fill="white" aria-hidden="true" />
+          <Link href={`/lesson/${lesson.id}`} className={[styles.btn, styles.btnStart].join(" ")}>
+            <Play size={15} fill="white" />
             <span>Commencer</span>
           </Link>
         )}
