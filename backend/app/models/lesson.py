@@ -22,7 +22,7 @@ class Unit(SQLModel, table=True):
     __table_args__ = (UniqueConstraint("level_code", "number", name="uq_unit_level_number"),)
 
     id: int | None = Field(default=None, primary_key=True)
-    level_code: str = Field(foreign_key="level.code", index=True)
+    level_code: str = Field(foreign_key="level.code", index=True, max_length=2)
     number: int  # numéro de l'unité dans son niveau : 1, 2…
     title: str = Field(max_length=100)  # "Les bases"
 
@@ -96,7 +96,7 @@ class QuizQuestion(SQLModel, table=True):
     __table_args__ = (
         CheckConstraint(
             "type IN (" + ", ".join(f"'{t}'" for t in QUIZ_TYPES) + ")",
-            name="ck_quiz_question_type",
+            name="type",  # → ck_quiz_question_type (convention de nommage)
         ),
     )
 
