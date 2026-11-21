@@ -1,18 +1,15 @@
-// app/(app)/lesson/[id]/page.tsx
+// app/(app)/lesson/[id]/page.tsx — aiguille l'élève vers la partie à reprendre
 "use client";
 
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { MOCK_LESSONS } from "@/lib/constants";
 import Link from "next/link";
+import { useLesson } from "@/hooks/useLessons";
 
 export default function LessonRouter() {
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const router = useRouter();
-
-  const lesson = MOCK_LESSONS.find(
-    (l) => l.id === parseInt(params.id as string, 10)
-  );
+  const { lesson, loading, error } = useLesson(Number(params.id));
 
   useEffect(() => {
     if (!lesson) return;
@@ -33,12 +30,14 @@ export default function LessonRouter() {
     }
   }, [lesson, router]);
 
-  // Leçon inconnue
-  if (!lesson) {
+  // Leçon inconnue ou API injoignable
+  if (!loading && !lesson) {
     return (
       <div className="flex flex-col items-center justify-center h-[100dvh] bg-background p-4 text-center">
         <p className="text-text-muted font-bold mb-4">
-          Cette leçon n'est pas encore disponible.
+          {error
+            ? "Impossible de charger la leçon. Vérifie ta connexion."
+            : "Cette leçon n'est pas encore disponible."}
         </p>
         <Link
           href="/"
@@ -50,7 +49,7 @@ export default function LessonRouter() {
     );
   }
 
-  // Pendant la redirection
+  // Chargement, puis redirection
   return (
     <div className="flex items-center justify-center h-[100dvh] bg-background">
       <div className="flex flex-col items-center gap-3">
