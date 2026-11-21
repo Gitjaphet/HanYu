@@ -31,3 +31,12 @@ def client(session: Session) -> Iterator[TestClient]:
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def seeded(session: Session) -> Session:
+    """Base de test remplie avec le vrai lessons.json (10 leçons)."""
+    from app.seed.load_lessons import DEFAULT_FILE, load_seed_file, seed_lessons
+
+    seed_lessons(session, load_seed_file(DEFAULT_FILE))
+    return session
