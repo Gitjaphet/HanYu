@@ -1,27 +1,37 @@
-// components/lesson/LessonState/LessonState.tsx — écrans communs : chargement et leçon indisponible
+// components/lesson/LessonState/LessonState.tsx — écrans communs : chargement et contenu indisponible
 import Link from "next/link";
 
-export function LessonLoading() {
+export function LessonLoading({ label = "Chargement de la leçon…" }: { label?: string }) {
   return (
     <div className="flex items-center justify-center h-[100dvh] bg-background">
       <div className="flex flex-col items-center gap-3">
         <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-        <p className="text-text-muted font-bold text-sm">Chargement de la leçon…</p>
+        <p className="text-text-muted font-bold text-sm">{label}</p>
       </div>
     </div>
   );
 }
 
-export function LessonUnavailable({ error }: { error: string | null }) {
+type UnavailableProps = {
+  error: string | null;
+  message?: string;
+  backHref?: string;
+  backLabel?: string;
+};
+
+export function LessonUnavailable({
+  error,
+  message = "Cette leçon n'est pas encore disponible.",
+  backHref = "/",
+  backLabel = "Retour au tableau de bord",
+}: UnavailableProps) {
   return (
     <div className="flex flex-col items-center justify-center h-[100dvh] bg-background p-4 text-center">
       <p className="text-text-muted font-bold mb-4">
-        {error
-          ? "Impossible de charger la leçon. Vérifie ta connexion."
-          : "Cette leçon n'est pas encore disponible."}
+        {error ? "Impossible de charger le contenu. Vérifie ta connexion." : message}
       </p>
-      <Link href="/" className="bg-primary text-white px-6 py-2.5 rounded-xl font-bold shadow-md">
-        Retour au tableau de bord
+      <Link href={backHref} className="bg-primary text-white px-6 py-2.5 rounded-xl font-bold shadow-md">
+        {backLabel}
       </Link>
     </div>
   );

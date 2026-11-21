@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Trophy, AlertTriangle, RotateCcw, Heart } from "lucide-react";
-import { MOCK_LESSONS } from "@/lib/constants";
+import type { Lesson } from "@/types";
 import { DialogueLine } from "@/types";
 import PandaMascot from "@/components/lesson/PandaMascot/PandaMascot";
 
@@ -17,7 +17,7 @@ function getCleanChars(hanziString: string) {
   return cleanStr.split("");
 }
 
-export default function PhraseMystere({ level }: { level: string }) {
+export default function PhraseMystere({ lessons }: { lessons: Lesson[] }) {
   const router = useRouter();
 
   const [rounds, setRounds] = useState<DialogueLine[]>([]);
@@ -35,7 +35,6 @@ export default function PhraseMystere({ level }: { level: string }) {
   // Initialiser la partie
   const initGame = useCallback(() => {
     // 1. Récupérer tous les dialogues du niveau
-    const lessons = MOCK_LESSONS.filter((l) => l.levelId === level);
     const allDialogues = lessons.flatMap((l) => l.dialogue);
 
     if (allDialogues.length === 0) return;
@@ -48,7 +47,7 @@ export default function PhraseMystere({ level }: { level: string }) {
     setIsWon(false);
     setIsLost(false);
     loadRound(selected[0]);
-  }, [level]);
+  }, [lessons]);
 
   // Charger un round spécifique
   const loadRound = (line: DialogueLine) => {

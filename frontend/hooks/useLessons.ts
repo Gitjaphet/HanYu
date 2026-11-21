@@ -1,7 +1,7 @@
 // hooks/useLessons.ts — les composants lisent les leçons via ces hooks, jamais MOCK_LESSONS
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Lesson } from "@/types";
 import { getLesson, getLessons } from "@/lib/lessons";
 
@@ -45,4 +45,13 @@ export function useLesson(id: number) {
     loading: current === null,
     error: current?.error ?? null,
   };
+}
+
+export function useLessonsByLevel(level: string) {
+  const { lessons, loading, error } = useLessons();
+  const levelLessons = useMemo(
+    () => lessons.filter((l) => l.levelId === level),
+    [lessons, level]
+  );
+  return { lessons: levelLessons, loading, error };
 }

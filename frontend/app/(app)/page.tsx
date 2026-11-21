@@ -1,7 +1,9 @@
 "use client";
 
 import { LessonCard } from "@/components/lesson/LessonCard/LessonCard";
-import { MOCK_LESSONS, LEVEL_META } from "../../lib/constants";
+import { LEVEL_META } from "@/lib/constants";
+import { useLessons } from "@/hooks/useLessons";
+import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
 import styles from "./page.module.css";
 
 import { use, useEffect, useState } from "react";
@@ -17,7 +19,9 @@ export default  function HomePage({
 
   const meta = LEVEL_META[activeLevel] ?? LEVEL_META["A"];
 
-  const lessonsForUnit = MOCK_LESSONS.filter(
+  const { lessons, loading, error } = useLessons();
+
+  const lessonsForUnit = lessons.filter(
     l => l.levelId === activeLevel && l.unitId === activeUnit
   );
   const currentUnitTitle = lessonsForUnit[0]?.unitTitle ?? "";
@@ -37,9 +41,9 @@ export default  function HomePage({
   const dynamicLessons = lessonsForUnit.map((lesson) => {
     const isCompleted = completedIds.includes(lesson.id);
     
-    // 💡 On cherche l'index de cette leçon dans tout le cursus (MOCK_LESSONS)
-    const globalIndex = MOCK_LESSONS.findIndex(l => l.id === lesson.id);
-    const previousGlobalLesson = MOCK_LESSONS[globalIndex - 1];
+    // 💡 On cherche l'index de cette leçon dans tout le cursus
+    const globalIndex = lessons.findIndex(l => l.id === lesson.id);
+    const previousGlobalLesson = lessons[globalIndex - 1];
     
     // La leçon qui précède (même si elle est dans une autre unité/niveau) est-elle finie ?
     const isPreviousCompleted = previousGlobalLesson ? completedIds.includes(previousGlobalLesson.id) : false;
@@ -55,6 +59,9 @@ export default  function HomePage({
 
     return { ...lesson, status: dynamicStatus };
   });
+
+  if (loading) return <LessonLoading label="Chargement des leçons…" />;
+  if (error) return <LessonUnavailable error={error} />;
 
   return (
     <div className={styles.page}>
