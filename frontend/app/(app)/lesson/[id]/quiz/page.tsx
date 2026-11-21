@@ -3,7 +3,8 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
-import { MOCK_LESSONS } from "@/lib/constants";
+import { useLesson } from "@/hooks/useLessons";
+import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
 import { QuizQuestion } from "@/types";
 import { X, CheckCircle2, AlertCircle, ChevronRight, Trophy, ChevronLeft } from "lucide-react";
 import PandaMascot, { PandaState } from "@/components/lesson/PandaMascot/PandaMascot";
@@ -37,9 +38,9 @@ function getQuestionSubtitle(q: QuizQuestion): string {
 type AnswerState = "idle" | "correct" | "wrong";
 
 export default function QuizPage() {
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const router = useRouter();
-  const lesson = MOCK_LESSONS.find((l) => l.id === parseInt(params.id as string, 10));
+  const { lesson, loading, error } = useLesson(Number(params.id));
 
   const [questions, setQuestions] = useState<QuizQuestion[]>(lesson?.quiz ?? []);
 
@@ -110,12 +111,9 @@ export default function QuizPage() {
   }, [isFinished, lesson, score, questions.length, xp]);
 
   // ─── Garde ────────────────────────────────────────────────────────────────
+  if (loading) return <LessonLoading />;
   if (!lesson || questions.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-[100dvh]">
-        <p className="text-text-muted font-bold">Leçon introuvable.</p>
-      </div>
-    );
+    return <LessonUnavailable error={error} />;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

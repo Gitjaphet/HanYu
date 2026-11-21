@@ -3,7 +3,8 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { MOCK_LESSONS } from "@/lib/constants";
+import { useLesson } from "@/hooks/useLessons";
+import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
 import { VocabItem } from "@/types";
 import { ArrowLeft, Volume2, Mic, MicOff, ChevronRight, RotateCcw, CheckCircle2 } from "lucide-react";
 import Lottie from "lottie-react";
@@ -40,9 +41,9 @@ function MicWave({ isListening }: { isListening: boolean }) {
 }
 
 export default function VocabPage() {
-  const params  = useParams();
+  const params = useParams<{ id: string }>();
   const router  = useRouter();
-  const lesson  = MOCK_LESSONS.find((l) => l.id === parseInt(params.id as string, 10));
+  const { lesson, loading, error } = useLesson(Number(params.id));
 
 
   const [hasStarted, setHasStarted] = useState(false);
@@ -266,12 +267,9 @@ export default function VocabPage() {
     setShowBackConfirm(true);
   }, [stopListening]);
 
+  if (loading) return <LessonLoading />;
   if (!lesson || vocab.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-[100dvh]">
-        <p className="text-text-muted font-bold">Leçon introuvable.</p>
-      </div>
-    );
+    return <LessonUnavailable error={error} />;
   }
 
   // NOUVEAU : Écran de lancement obligatoire pour iOS
