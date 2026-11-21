@@ -4,6 +4,8 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
 import { useLesson } from "@/hooks/useLessons";
+import { useProgressStore } from "@/store/progressStore";
+import { quizStars } from "@/lib/progress";
 import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
 import { QuizQuestion } from "@/types";
 import { X, CheckCircle2, AlertCircle, ChevronRight, Trophy, ChevronLeft } from "lucide-react";
@@ -41,6 +43,7 @@ export default function QuizPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { lesson, loading, error } = useLesson(Number(params.id));
+  const completeQuiz = useProgressStore((s) => s.completeQuiz);
 
   const [questions, setQuestions] = useState<QuizQuestion[]>(lesson?.quiz ?? []);
 
@@ -101,14 +104,8 @@ export default function QuizPage() {
   // ─── Sauvegarde ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isFinished || !lesson) return;
-    const stored = localStorage.getItem(`lesson_progress_${lesson.id}`);
-    const prev   = stored ? JSON.parse(stored) : {};
-    const stars  = score === questions.length ? 3 : score >= questions.length * 0.7 ? 2 : 1;
-    localStorage.setItem(
-      `lesson_progress_${lesson.id}`,
-      JSON.stringify({ ...prev, quizDone: true, stars, xp })
-    );
-  }, [isFinished, lesson, score, questions.length, xp]);
+    completeQuiz(lesson.id, { stars: quizStars(score, questions.length, hearts <= 0), xp });
+  }, [isFinished, lesson, score, questions.length, hearts, xp, completeQuiz]);
 
   // ─── Garde ────────────────────────────────────────────────────────────────
   if (loading) return <LessonLoading />;
@@ -120,7 +117,7 @@ export default function QuizPage() {
   // ── ÉCRAN DE FIN ──────────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
   if (isFinished) {
-    const stars   = score === questions.length ? 3 : score >= questions.length * 0.7 ? 2 : 1;
+    const stars   = quizStars(score, questions.length, hearts <= 0);
     const perfect = score === questions.length;
     const failed  = hearts <= 0;
 

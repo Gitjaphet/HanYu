@@ -3,10 +3,12 @@
 import { LessonCard } from "@/components/lesson/LessonCard/LessonCard";
 import { LEVEL_META } from "@/lib/constants";
 import { useLessons } from "@/hooks/useLessons";
+import { useProgressStore } from "@/store/progressStore";
+import { lessonStatus } from "@/lib/progress";
 import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
 import styles from "./page.module.css";
 
-import { use, useEffect, useState } from "react";
+import { use } from "react";
 
 export default  function HomePage({
   searchParams,
@@ -26,41 +28,16 @@ export default  function HomePage({
   );
   const currentUnitTitle = lessonsForUnit[0]?.unitTitle ?? "";
 
-  const [completedIds, setCompletedIds] = useState<number[]>([]);
+  const progress = useProgressStore((s) => s.progress);
+  const hydrated = useProgressStore((s) => s.hydrated);
 
-  useEffect(() => {
-    // Au chargement, on lit les leçons terminées dans la mémoire du navigateur
-    const stored = localStorage.getItem("completedLessons");
-    if (stored) {
-      setCompletedIds(JSON.parse(stored));
-    }
-  }, []);
+  // Statut de chaque carte : une seule règle, celle de lib/progress.ts
+  const dynamicLessons = lessonsForUnit.map((lesson) => ({
+    ...lesson,
+    status: lessonStatus(lessons, progress, lesson.id),
+  }));
 
-  // On recalcule le statut dynamiquement pour chaque carte
-  // On recalcule le statut dynamiquement en vérifiant la progression GLOBALE
-  const dynamicLessons = lessonsForUnit.map((lesson) => {
-    const isCompleted = completedIds.includes(lesson.id);
-    
-    // 💡 On cherche l'index de cette leçon dans tout le cursus
-    const globalIndex = lessons.findIndex(l => l.id === lesson.id);
-    const previousGlobalLesson = lessons[globalIndex - 1];
-    
-    // La leçon qui précède (même si elle est dans une autre unité/niveau) est-elle finie ?
-    const isPreviousCompleted = previousGlobalLesson ? completedIds.includes(previousGlobalLesson.id) : false;
-
-    let dynamicStatus = lesson.status;
-    if (isCompleted) {
-      dynamicStatus = 'completed'; // Bouton "RÉVISER"
-    } else if (lesson.id === 1 || isPreviousCompleted) {
-      dynamicStatus = 'available'; // Bouton "COMMENCER"
-    } else {
-      dynamicStatus = 'locked';    // Cadenas
-    }
-
-    return { ...lesson, status: dynamicStatus };
-  });
-
-  if (loading) return <LessonLoading label="Chargement des leçons…" />;
+  if (loading || !hydrated) return <LessonLoading label="Chargement des leçons…" />;
   if (error) return <LessonUnavailable error={error} />;
 
   return (
@@ -106,7 +83,7 @@ export default  function HomePage({
 
             <div className={styles.grid}>
                 {dynamicLessons.map((lesson) => (
-                <LessonCard key={lesson.id} lesson={lesson as any} starsEarned={0} />
+                <LessonCard key={lesson.id} lesson={lesson} starsEarned={progress[lesson.id]?.stars ?? 0} />
               ))}
             </div>
           </>

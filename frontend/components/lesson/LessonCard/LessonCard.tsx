@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Lock, Play, RotateCcw, Star } from "lucide-react";
 import { Lesson } from "@/types";
@@ -21,42 +20,10 @@ const MODULE_MAP: Record<string, { label: string; cls: string }> = {
   pairs:      { label: "Paires",     cls: styles.mpPairs    },
 };
 
-const STARS_MAP: Record<number, number> = {
-  1: 5,
-  2: 3,
-};
-
-export function LessonCard({ lesson, starsEarned, lessonNumber }: LessonCardProps) {
-  // On utilise des états locaux pour pouvoir écraser MOCK_LESSONS avec le localStorage
-  const [isCompleted, setIsCompleted] = useState(lesson.status === "completed");
-  const [isLocked, setIsLocked] = useState(lesson.status === "locked");
-  const [stars, setStars] = useState(starsEarned ?? STARS_MAP[lesson.id] ?? 0);
-
-  useEffect(() => {
-    // 1. Vérifier si CETTE leçon a été terminée (quizDone)
-    const storedCurrent = localStorage.getItem(`lesson_progress_${lesson.id}`);
-    if (storedCurrent) {
-      const progress = JSON.parse(storedCurrent);
-      if (progress.quizDone) {
-        setIsCompleted(true);
-        setIsLocked(false);
-        if (progress.stars) setStars(progress.stars);
-      }
-    }
-
-    // 2. Vérifier si la leçon PRÉCÉDENTE a été terminée pour déverrouiller celle-ci
-    if (lesson.id > 1 && lesson.status === "locked") {
-      const storedPrev = localStorage.getItem(`lesson_progress_${lesson.id - 1}`);
-      if (storedPrev) {
-        const prevProgress = JSON.parse(storedPrev);
-        if (prevProgress.quizDone) {
-          setIsLocked(false);
-        }
-      }
-    }
-  }, [lesson.id, lesson.status]);
-
-  const filledStars = Math.round((stars / 5) * 3);
+export function LessonCard({ lesson, starsEarned = 0, lessonNumber }: LessonCardProps) {
+  const isCompleted = lesson.status === "completed";
+  const isLocked    = lesson.status === "locked";
+  const filledStars = Math.min(3, Math.max(0, starsEarned)); // 0 à 3, comme le quiz
   const accentColor = lesson.color ?? "var(--color-primary)";
 
   return (
