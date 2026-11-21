@@ -42,3 +42,41 @@ export function lessonStatus(lessons: Lesson[], progress: ProgressMap, lessonId:
 
   return p?.vocabDone || p?.dialogueDone ? "in-progress" : "available";
 }
+
+/** Résultat d'un quiz : un quiz raté (0 étoile) ne change rien, sinon on garde le meilleur score. */
+export function applyQuizResult(current: LessonProgress, stars: number, xp: number, now: string): LessonProgress {
+  if (stars === 0) return current;
+  return {
+    ...current,
+    quizDone: true,
+    stars: Math.max(current.stars, stars),
+    xp: Math.max(current.xp, xp),
+    completedAt: current.completedAt ?? now,
+  };
+}
+
+export const LEGACY_PREFIX = "lesson_progress_";
+
+/** Reprend les anciennes clés localStorage `lesson_progress_<id>` (avant le store Zustand). */
+export function parseLegacyProgress(entries: Array<[string, string | null]>): ProgressMap {
+  const result: ProgressMap = {};
+  for (const [key, raw] of entries) {
+    if (!key.startsWith(LEGACY_PREFIX) || !raw) continue;
+    const lessonId = Number(key.slice(LEGACY_PREFIX.length));
+    if (!Number.isInteger(lessonId) || lessonId <= 0) continue;
+    try {
+      const old = JSON.parse(raw);
+      result[lessonId] = {
+        ...emptyProgress(lessonId),
+        vocabDone: Boolean(old.vocabDone),
+        dialogueDone: Boolean(old.dialogueDone),
+        quizDone: Boolean(old.quizDone),
+        stars: Number(old.stars) || 0,
+        xp: Number(old.xp) || 0,
+      };
+    } catch {
+      // entrée corrompue : ignorée
+    }
+  }
+  return result;
+}
