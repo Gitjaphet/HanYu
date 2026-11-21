@@ -31,3 +31,18 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   return response.json() as Promise<T>;
 }
+
+/**
+ * Partage une même requête entre tous les composants qui la demandent (accueil, menus…) :
+ * un seul appel réseau par chargement de page. En cas d'échec, l'appel suivant réessaie.
+ */
+export function sharedRequest<T>(load: () => Promise<T>): () => Promise<T> {
+  let pending: Promise<T> | null = null;
+  return () => {
+    pending ??= load().catch((error) => {
+      pending = null;
+      throw error;
+    });
+    return pending;
+  };
+}

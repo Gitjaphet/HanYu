@@ -1,11 +1,11 @@
 // lib/lessons.ts — le contenu vient de l'API FastAPI (source unique : backend/app/seed/lessons.json)
 
 import type { CurriculumLevel, Lesson } from "@/types";
-import { ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch, sharedRequest } from "@/lib/api";
 
-export function getLessons(): Promise<Lesson[]> {
-  return apiFetch<Lesson[]>("/lessons");
-}
+export const getLessons = sharedRequest(() => apiFetch<Lesson[]>("/lessons"));
+
+export const getCurriculum = sharedRequest(() => apiFetch<CurriculumLevel[]>("/curriculum"));
 
 export async function getLesson(id: number): Promise<Lesson | null> {
   try {
@@ -14,8 +14,4 @@ export async function getLesson(id: number): Promise<Lesson | null> {
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
   }
-}
-
-export function getCurriculum(): Promise<CurriculumLevel[]> {
-  return apiFetch<CurriculumLevel[]>("/curriculum");
 }
