@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
+import app.models  # noqa: F401  (enregistre les tables pour create_all)
 from app.core.db import get_session
 from app.main import app
 
