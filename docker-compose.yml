@@ -1,52 +1,22 @@
-version: '3.8'
-
+# Développement local : uniquement PostgreSQL (la production aura son propre fichier)
 services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: chinois_backend
+  db:
+    image: postgres:18-alpine
+    container_name: hanyu_db
     restart: unless-stopped
-    ports:
-      - "5000:5000"
-    volumes:
-      # Synchronisation du code en temps réel
-      - ./backend:/app:z
-      # Volume pour la base de données SQLite locale
-      - sqlite_data:/app/db_data
-    networks:
-      - app_chinois_net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: chinois_frontend
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
-      # L'URL de l'API Flask vue par le navigateur de l'utilisateur
-      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      POSTGRES_USER: hanyu
+      POSTGRES_PASSWORD: hanyu
+      POSTGRES_DB: hanyu
+    ports:
+      - "127.0.0.1:5433:5432"
     volumes:
-      # Synchronisation du code en temps réel
-      - ./frontend:/app:z
-      # On ignore le dossier node_modules local pour utiliser celui du conteneur
-      - /app/node_modules
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - app_chinois_net
-
-networks:
-  app_chinois_net:
-    driver: bridge
+      - hanyu_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hanyu -d hanyu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  sqlite_data:
+  hanyu_pgdata:
