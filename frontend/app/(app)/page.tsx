@@ -1,8 +1,7 @@
 "use client";
 
 import { LessonCard } from "@/components/lesson/LessonCard/LessonCard";
-import { LEVEL_META } from "@/lib/constants";
-import { useLessons } from "@/hooks/useLessons";
+import { useCurriculum, useLessons } from "@/hooks/useLessons";
 import { useProgressStore } from "@/store/progressStore";
 import { lessonStatus } from "@/lib/progress";
 import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
@@ -19,9 +18,9 @@ export default  function HomePage({
   const activeLevel = sp.level || "A";
   const activeUnit  = sp.unit ? parseInt(sp.unit, 10) : 1;
 
-  const meta = LEVEL_META[activeLevel] ?? LEVEL_META["A"];
-
   const { lessons, loading, error } = useLessons();
+  const curriculum = useCurriculum();
+  const meta = curriculum.data.find((lv) => lv.code === activeLevel);
 
   const lessonsForUnit = lessons.filter(
     l => l.levelId === activeLevel && l.unitId === activeUnit
@@ -31,14 +30,8 @@ export default  function HomePage({
   const progress = useProgressStore((s) => s.progress);
   const hydrated = useProgressStore((s) => s.hydrated);
 
-  // Statut de chaque carte : une seule règle, celle de lib/progress.ts
-  const dynamicLessons = lessonsForUnit.map((lesson) => ({
-    ...lesson,
-    status: lessonStatus(lessons, progress, lesson.id),
-  }));
-
-  if (loading || !hydrated) return <LessonLoading label="Chargement des leçons…" />;
-  if (error) return <LessonUnavailable error={error} />;
+  if (loading || curriculum.loading || !hydrated) return <LessonLoading label="Chargement des leçons…" />;
+  if (error || curriculum.error) return <LessonUnavailable error={error ?? curriculum.error} />;
 
   return (
     <div className={styles.page}>
@@ -47,12 +40,12 @@ export default  function HomePage({
       <header className={styles.hero}>
         <div className={styles.heroContent}>
           <div className={styles.heroLeft}>
-            <span className={styles.heroTag}>{meta.tag}</span>
+            <span className={styles.heroTag}>{meta?.tag}</span>
             <h1 className={styles.heroTitle}>
               <span className={styles.heroTitleOutline}>Niveau</span>
               <span className={styles.heroTitleSolid}>{activeLevel}</span>
             </h1>
-            <p className={styles.heroSub}>{meta.subtitle}</p>
+            <p className={styles.heroSub}>{meta?.subtitle}</p>
           </div>
 
           <div className={styles.heroRight}>
@@ -82,8 +75,13 @@ export default  function HomePage({
             </div>
 
             <div className={styles.grid}>
-                {dynamicLessons.map((lesson) => (
-                <LessonCard key={lesson.id} lesson={lesson} starsEarned={progress[lesson.id]?.stars ?? 0} />
+                {lessonsForUnit.map((lesson) => (
+                <LessonCard
+                  key={lesson.id}
+                  lesson={lesson}
+                  status={lessonStatus(lessons, progress, lesson.id)}
+                  starsEarned={progress[lesson.id]?.stars ?? 0}
+                />
               ))}
             </div>
           </>

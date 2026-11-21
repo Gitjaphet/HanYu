@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { Lock, Play, RotateCcw, Star } from "lucide-react";
-import { Lesson } from "@/types";
+import type { Lesson, LessonStatus } from "@/types";
 import styles from "./LessonCard.module.css";
 
 interface LessonCardProps {
   lesson: Lesson;
+  status: LessonStatus;
   starsEarned?: number;
   lessonNumber?: number;
 }
@@ -20,9 +21,9 @@ const MODULE_MAP: Record<string, { label: string; cls: string }> = {
   pairs:      { label: "Paires",     cls: styles.mpPairs    },
 };
 
-export function LessonCard({ lesson, starsEarned = 0, lessonNumber }: LessonCardProps) {
-  const isCompleted = lesson.status === "completed";
-  const isLocked    = lesson.status === "locked";
+export function LessonCard({ lesson, status, starsEarned = 0, lessonNumber }: LessonCardProps) {
+  const isCompleted = status === "completed";
+  const isLocked    = status === "locked";
   const filledStars = Math.min(3, Math.max(0, starsEarned)); // 0 à 3, comme le quiz
   const accentColor = lesson.color ?? "var(--color-primary)";
 

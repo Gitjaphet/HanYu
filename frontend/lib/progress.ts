@@ -1,6 +1,6 @@
 // lib/progress.ts — règles de progression (pures : pas de React, pas de localStorage)
 
-import type { Lesson, LessonProgress } from "@/types";
+import type { Lesson, LessonProgress, LessonStatus } from "@/types";
 
 export type ProgressMap = Record<number, LessonProgress>;
 export type LessonStep = "vocab" | "dialogue" | "quiz";
@@ -29,7 +29,7 @@ export function nextStep(progress: LessonProgress | undefined): LessonStep | nul
  * Statut d'une leçon dans le cursus. `lessons` doit être dans l'ordre du cursus :
  * une leçon se déverrouille quand la précédente (même dans une autre unité) est terminée.
  */
-export function lessonStatus(lessons: Lesson[], progress: ProgressMap, lessonId: number): Lesson["status"] {
+export function lessonStatus(lessons: Lesson[], progress: ProgressMap, lessonId: number): LessonStatus {
   const p = progress[lessonId];
   if (p?.quizDone) return "completed";
 

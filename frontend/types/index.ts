@@ -14,6 +14,9 @@ export interface User {
 
 export type ModuleType = 'vocab' | 'dialogue' | 'quiz'
 
+/** Statut d'une leçon POUR UN ÉLÈVE : calculé depuis sa progression (lib/progress.ts), pas fourni par l'API */
+export type LessonStatus = 'locked' | 'available' | 'in-progress' | 'completed'
+
 export interface Badge {
   id: string
   name: string
@@ -36,7 +39,6 @@ export interface Lesson {
   description: string
   language: string  
   modules: ModuleType[]      // 'chinese' — extensible
-  status: 'locked' | 'available' | 'in-progress' | 'completed'
   color: string
   // ↓ Nouveau : les 3 parties de la leçon
   vocabulaire: VocabItem[]
@@ -116,4 +118,19 @@ export interface Progress {
   stars: number
   completedModules: ModuleType[]
   completedAt?: string
+}
+// ─── Cursus (GET /curriculum) ─────────────────────────────────────────────
+
+export interface CurriculumUnit {
+  number: number
+  title: string
+  lessonIds: number[]
+}
+
+export interface CurriculumLevel {
+  code: string
+  label: string
+  subtitle: string
+  tag: string
+  units: CurriculumUnit[]
 }

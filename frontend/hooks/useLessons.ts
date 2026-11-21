@@ -1,27 +1,37 @@
-// hooks/useLessons.ts — les composants lisent les leçons via ces hooks, jamais MOCK_LESSONS
+// hooks/useLessons.ts — les composants lisent le contenu via ces hooks, jamais l'API directement
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Lesson } from "@/types";
-import { getLesson, getLessons } from "@/lib/lessons";
+import type { CurriculumLevel, Lesson } from "@/types";
+import { getCurriculum, getLesson, getLessons } from "@/lib/lessons";
 
-export function useLessons() {
-  const [lessons, setLessons] = useState<Lesson[]>([]);
+/** Charge une liste une fois au montage : renvoie les données, l'état de chargement et l'erreur. */
+function useList<T>(load: () => Promise<T[]>) {
+  const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    getLessons()
-      .then((data) => active && setLessons(data))
+    load()
+      .then((result) => active && setData(result))
       .catch((e: Error) => active && setError(e.message))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, []);
+  }, [load]);
 
-  return { lessons, loading, error };
+  return { data, loading, error };
+}
+
+export function useLessons() {
+  const { data, loading, error } = useList<Lesson>(getLessons);
+  return { lessons: data, loading, error };
+}
+
+export function useCurriculum() {
+  return useList<CurriculumLevel>(getCurriculum);
 }
 
 type LessonState = { id: number; lesson: Lesson | null; error: string | null };
