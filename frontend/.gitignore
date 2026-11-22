@@ -33,6 +33,7 @@ yarn-error.log*
 
 # env files (très important de garder l'étoile pour tout bloquer)
 .env*
+!.env.example
 
 # vercel
 .vercel

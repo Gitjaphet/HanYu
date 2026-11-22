@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Trophy, AlertTriangle, RotateCcw, Clock, CheckCircle2 } from "lucide-react";
-import { MOCK_LESSONS } from "@/lib/constants";
+import type { Lesson } from "@/types";
 import PandaMascot from "@/components/lesson/PandaMascot/PandaMascot";
 
 const INITIAL_TIME = 45; // Secondes
@@ -17,7 +17,7 @@ type VocabWord = {
   french: string;
 };
 
-export default function SpeedTyping({ level }: { level: string }) {
+export default function SpeedTyping({ lessons }: { lessons: Lesson[] }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -32,7 +32,6 @@ export default function SpeedTyping({ level }: { level: string }) {
 
   // Initialisation
   const initGame = useCallback(() => {
-    const lessons = MOCK_LESSONS.filter(l => l.levelId === level);
     const allVocab = lessons.flatMap(l => l.vocabulaire);
     
     // On mélange beaucoup de mots (s'il n'y en a pas assez, on les duplique)
@@ -51,7 +50,7 @@ export default function SpeedTyping({ level }: { level: string }) {
     
     // Focus l'input au démarrage
     setTimeout(() => inputRef.current?.focus(), 100);
-  }, [level]);
+  }, [lessons]);
 
   useEffect(() => {
     initGame();

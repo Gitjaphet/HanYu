@@ -1,6 +1,7 @@
 import React from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { ProgressHydrator } from "@/components/providers/ProgressHydrator";
 import styles from "./layout.module.css";
 
 export default function AppLayout({
@@ -10,6 +11,7 @@ export default function AppLayout({
 }) {
   return (
     <div className={styles.appShell}>
+      <ProgressHydrator />
 
       {/* ═══ BLOBS DÉCORATIFS ═══ */}
       <div className={styles.blobs} aria-hidden="true">

@@ -8,29 +8,15 @@ import {
   Dumbbell, Gamepad2, GraduationCap, Settings // Ajout de Settings
 } from "lucide-react";
 import styles from "./BottomNav.module.css";
-
-const curriculum = [
-  {
-    levelId: "A",
-    label: "Initiation",
-    units: [
-      { id: 1, title: "Les bases" },
-      { id: 2, title: "Se présenter" },
-    ],
-  },
-  {
-    levelId: "B",
-    label: "Intermédiaire",
-    units: [{ id: 1, title: "Au restaurant" }],
-  },
-  { levelId: "C", label: "Avancé", units: [] },
-];
+import { useCurriculum } from "@/hooks/useLessons";
 
 function BottomNavContent() {
   const pathname     = usePathname();
   const searchParams = useSearchParams();
   const currentLevel = searchParams.get("level") ?? "A";
   const currentUnit  = Number(searchParams.get("unit") ?? "1");
+
+  const { data: curriculum } = useCurriculum();
 
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [expandedLevel, setExpandedLevel] = useState<string>(currentLevel);
@@ -69,19 +55,19 @@ function BottomNavContent() {
 
         <div className={styles.drawerBody}>
           {curriculum.map((lvl) => {
-            const isExpanded    = expandedLevel === lvl.levelId;
-            const isActiveLevel = currentLevel === lvl.levelId;
+            const isExpanded    = expandedLevel === lvl.code;
+            const isActiveLevel = currentLevel === lvl.code;
 
             return (
-              <div key={lvl.levelId} className={styles.drawerGroup}>
+              <div key={lvl.code} className={styles.drawerGroup}>
                 <button
                   className={`${styles.drawerLevel} ${isActiveLevel ? styles.drawerLevelActive : ""}`}
-                  onClick={() => toggleLevel(lvl.levelId)}
+                  onClick={() => toggleLevel(lvl.code)}
                 >
                   <div className={styles.drawerLevelLeft}>
-                    <span className={styles.drawerLevelBadge}>{lvl.levelId}</span>
+                    <span className={styles.drawerLevelBadge}>{lvl.code}</span>
                     <div>
-                      <span className={styles.drawerLevelName}>Niveau {lvl.levelId}</span>
+                      <span className={styles.drawerLevelName}>Niveau {lvl.code}</span>
                       <span className={styles.drawerLevelSub}>{lvl.label}</span>
                     </div>
                   </div>
@@ -98,19 +84,19 @@ function BottomNavContent() {
                   <div className={`${styles.drawerUnits} ${isExpanded ? styles.drawerUnitsOpen : ""}`}>
                     {lvl.units.map((u) => {
                       const isUnitActive =
-                        currentUnit === u.id &&
-                        currentLevel === lvl.levelId &&
+                        currentUnit === u.number &&
+                        currentLevel === lvl.code &&
                         pathname === "/";
 
                       return (
                         <Link
-                          key={u.id}
-                          href={`/?level=${lvl.levelId}&unit=${u.id}`}
+                          key={u.number}
+                          href={`/?level=${lvl.code}&unit=${u.number}`}
                           className={`${styles.drawerUnit} ${isUnitActive ? styles.drawerUnitActive : ""}`}
                           onClick={handleUnitClick}
                         >
                           <span className={styles.drawerUnitDot} />
-                          <span>Unité {u.id}</span>
+                          <span>Unité {u.number}</span>
                           <span className={styles.drawerUnitTitle}>{u.title}</span>
                         </Link>
                       );

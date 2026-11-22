@@ -1,0 +1,82 @@
+// lib/progress.ts — règles de progression (pures : pas de React, pas de localStorage)
+
+import type { Lesson, LessonProgress, LessonStatus } from "@/types";
+
+export type ProgressMap = Record<number, LessonProgress>;
+export type LessonStep = "vocab" | "dialogue" | "quiz";
+
+export function emptyProgress(lessonId: number): LessonProgress {
+  return { lessonId, vocabDone: false, dialogueDone: false, quizDone: false, stars: 0, xp: 0 };
+}
+
+/** Étoiles du quiz : 3 = sans faute, 2 = au moins 70 %, 1 = réussi, 0 = échoué. */
+export function quizStars(score: number, total: number, failed: boolean): number {
+  if (failed || total === 0) return 0;
+  if (score === total) return 3;
+  if (score >= total * 0.7) return 2;
+  return 1;
+}
+
+/** Prochaine partie à faire dans une leçon, ou null si tout est terminé. */
+export function nextStep(progress: LessonProgress | undefined): LessonStep | null {
+  if (!progress?.vocabDone) return "vocab";
+  if (!progress.dialogueDone) return "dialogue";
+  if (!progress.quizDone) return "quiz";
+  return null;
+}
+
+/**
+ * Statut d'une leçon dans le cursus. `lessons` doit être dans l'ordre du cursus :
+ * une leçon se déverrouille quand la précédente (même dans une autre unité) est terminée.
+ */
+export function lessonStatus(lessons: Lesson[], progress: ProgressMap, lessonId: number): LessonStatus {
+  const p = progress[lessonId];
+  if (p?.quizDone) return "completed";
+
+  const index = lessons.findIndex((l) => l.id === lessonId);
+  if (index === -1) return "locked";
+
+  const previous = lessons[index - 1];
+  const unlocked = index === 0 || Boolean(previous && progress[previous.id]?.quizDone);
+  if (!unlocked) return "locked";
+
+  return p?.vocabDone || p?.dialogueDone ? "in-progress" : "available";
+}
+
+/** Résultat d'un quiz : un quiz raté (0 étoile) ne change rien, sinon on garde le meilleur score. */
+export function applyQuizResult(current: LessonProgress, stars: number, xp: number, now: string): LessonProgress {
+  if (stars === 0) return current;
+  return {
+    ...current,
+    quizDone: true,
+    stars: Math.max(current.stars, stars),
+    xp: Math.max(current.xp, xp),
+    completedAt: current.completedAt ?? now,
+  };
+}
+
+export const LEGACY_PREFIX = "lesson_progress_";
+
+/** Reprend les anciennes clés localStorage `lesson_progress_<id>` (avant le store Zustand). */
+export function parseLegacyProgress(entries: Array<[string, string | null]>): ProgressMap {
+  const result: ProgressMap = {};
+  for (const [key, raw] of entries) {
+    if (!key.startsWith(LEGACY_PREFIX) || !raw) continue;
+    const lessonId = Number(key.slice(LEGACY_PREFIX.length));
+    if (!Number.isInteger(lessonId) || lessonId <= 0) continue;
+    try {
+      const old = JSON.parse(raw);
+      result[lessonId] = {
+        ...emptyProgress(lessonId),
+        vocabDone: Boolean(old.vocabDone),
+        dialogueDone: Boolean(old.dialogueDone),
+        quizDone: Boolean(old.quizDone),
+        stars: Number(old.stars) || 0,
+        xp: Number(old.xp) || 0,
+      };
+    } catch {
+      // entrée corrompue : ignorée
+    }
+  }
+  return result;
+}

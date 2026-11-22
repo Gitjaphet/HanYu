@@ -1,10 +1,13 @@
 "use client";
 
 import { LessonCard } from "@/components/lesson/LessonCard/LessonCard";
-import { MOCK_LESSONS, LEVEL_META } from "../../lib/constants";
+import { useCurriculum, useLessons } from "@/hooks/useLessons";
+import { useProgressStore } from "@/store/progressStore";
+import { lessonStatus } from "@/lib/progress";
+import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
 import styles from "./page.module.css";
 
-import { use, useEffect, useState } from "react";
+import { use } from "react";
 
 export default  function HomePage({
   searchParams,
@@ -15,46 +18,20 @@ export default  function HomePage({
   const activeLevel = sp.level || "A";
   const activeUnit  = sp.unit ? parseInt(sp.unit, 10) : 1;
 
-  const meta = LEVEL_META[activeLevel] ?? LEVEL_META["A"];
+  const { lessons, loading, error } = useLessons();
+  const curriculum = useCurriculum();
+  const meta = curriculum.data.find((lv) => lv.code === activeLevel);
 
-  const lessonsForUnit = MOCK_LESSONS.filter(
+  const lessonsForUnit = lessons.filter(
     l => l.levelId === activeLevel && l.unitId === activeUnit
   );
   const currentUnitTitle = lessonsForUnit[0]?.unitTitle ?? "";
 
-  const [completedIds, setCompletedIds] = useState<number[]>([]);
+  const progress = useProgressStore((s) => s.progress);
+  const hydrated = useProgressStore((s) => s.hydrated);
 
-  useEffect(() => {
-    // Au chargement, on lit les leçons terminées dans la mémoire du navigateur
-    const stored = localStorage.getItem("completedLessons");
-    if (stored) {
-      setCompletedIds(JSON.parse(stored));
-    }
-  }, []);
-
-  // On recalcule le statut dynamiquement pour chaque carte
-  // On recalcule le statut dynamiquement en vérifiant la progression GLOBALE
-  const dynamicLessons = lessonsForUnit.map((lesson) => {
-    const isCompleted = completedIds.includes(lesson.id);
-    
-    // 💡 On cherche l'index de cette leçon dans tout le cursus (MOCK_LESSONS)
-    const globalIndex = MOCK_LESSONS.findIndex(l => l.id === lesson.id);
-    const previousGlobalLesson = MOCK_LESSONS[globalIndex - 1];
-    
-    // La leçon qui précède (même si elle est dans une autre unité/niveau) est-elle finie ?
-    const isPreviousCompleted = previousGlobalLesson ? completedIds.includes(previousGlobalLesson.id) : false;
-
-    let dynamicStatus = lesson.status;
-    if (isCompleted) {
-      dynamicStatus = 'completed'; // Bouton "RÉVISER"
-    } else if (lesson.id === 1 || isPreviousCompleted) {
-      dynamicStatus = 'available'; // Bouton "COMMENCER"
-    } else {
-      dynamicStatus = 'locked';    // Cadenas
-    }
-
-    return { ...lesson, status: dynamicStatus };
-  });
+  if (loading || curriculum.loading || !hydrated) return <LessonLoading label="Chargement des leçons…" />;
+  if (error || curriculum.error) return <LessonUnavailable error={error ?? curriculum.error} />;
 
   return (
     <div className={styles.page}>
@@ -63,12 +40,12 @@ export default  function HomePage({
       <header className={styles.hero}>
         <div className={styles.heroContent}>
           <div className={styles.heroLeft}>
-            <span className={styles.heroTag}>{meta.tag}</span>
+            <span className={styles.heroTag}>{meta?.tag}</span>
             <h1 className={styles.heroTitle}>
               <span className={styles.heroTitleOutline}>Niveau</span>
               <span className={styles.heroTitleSolid}>{activeLevel}</span>
             </h1>
-            <p className={styles.heroSub}>{meta.subtitle}</p>
+            <p className={styles.heroSub}>{meta?.subtitle}</p>
           </div>
 
           <div className={styles.heroRight}>
@@ -98,8 +75,13 @@ export default  function HomePage({
             </div>
 
             <div className={styles.grid}>
-                {dynamicLessons.map((lesson) => (
-                <LessonCard key={lesson.id} lesson={lesson as any} starsEarned={0} />
+                {lessonsForUnit.map((lesson) => (
+                <LessonCard
+                  key={lesson.id}
+                  lesson={lesson}
+                  status={lessonStatus(lessons, progress, lesson.id)}
+                  starsEarned={progress[lesson.id]?.stars ?? 0}
+                />
               ))}
             </div>
           </>

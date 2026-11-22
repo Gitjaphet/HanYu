@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Trophy, RotateCcw, Clock, AlertTriangle } from "lucide-react";
-import { MOCK_LESSONS } from "@/lib/constants";
+import type { Lesson } from "@/types";
 import PandaMascot from "@/components/lesson/PandaMascot/PandaMascot";
 
 // Temps imparti pour le jeu (en secondes)
@@ -46,7 +46,7 @@ function GameCard({ card, onClick }: { card: Card; onClick: () => void }) {
 }
 
 // --- Composant Principal : Le Jeu ---
-export default function HanziHunt({ level, mode }: { level: string; mode: string }) {
+export default function HanziHunt({ level, mode, lessons }: { level: string; mode: string; lessons: Lesson[] }) {
   const router = useRouter();
   
   const [cards, setCards] = useState<Card[]>([]);
@@ -63,7 +63,6 @@ export default function HanziHunt({ level, mode }: { level: string; mode: string
 
   // Initialisation ou réinitialisation du jeu
   const initializeGame = useCallback((isRetry = false) => {
-    const lessons = MOCK_LESSONS.filter(l => l.levelId === level);
     const allVocab = lessons.flatMap(l => l.vocabulaire);
     const selectedVocab = [...allVocab].sort(() => Math.random() - 0.5).slice(0, 6);
 
@@ -109,7 +108,7 @@ export default function HanziHunt({ level, mode }: { level: string; mode: string
       // Si on gagne et qu'on relance complètement une nouvelle partie
       setAttempts(1);
     }
-  }, [level, mode]);
+  }, [lessons, mode]);
 
   useEffect(() => {
     initializeGame(false);

@@ -1,0 +1,68 @@
+# Production HanYu sur le VPS (/opt/hanyu). Secrets et domaine : fichier .env à côté (jamais dans git).
+name: hanyu
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hanyu
+      POSTGRES_DB: hanyu
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hanyu -d hanyu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: ghcr.io/gitjaphet/hanyu-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://hanyu:${POSTGRES_PASSWORD}@db:5432/hanyu
+      ENVIRONMENT: production
+      CORS_ORIGINS: '["https://${DOMAIN:?DOMAIN manquant dans .env}"]'
+      UVICORN_ROOT_PATH: /api
+    networks:
+      - internal
+      - traefik_proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik_proxy
+      - traefik.http.routers.hanyu-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)
+      - traefik.http.routers.hanyu-api.entrypoints=websecure
+      - traefik.http.routers.hanyu-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.hanyu-api.middlewares=hanyu-api-strip
+      - traefik.http.middlewares.hanyu-api-strip.stripprefix.prefixes=/api
+      - traefik.http.services.hanyu-api.loadbalancer.server.port=8000
+
+  web:
+    image: ghcr.io/gitjaphet/hanyu-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - traefik_proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik_proxy
+      - traefik.http.routers.hanyu-web.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.hanyu-web.entrypoints=websecure
+      - traefik.http.routers.hanyu-web.tls.certresolver=letsencrypt
+      - traefik.http.services.hanyu-web.loadbalancer.server.port=3000
+
+volumes:
+  pgdata:
+
+networks:
+  internal:
+  traefik_proxy:
+    external: true

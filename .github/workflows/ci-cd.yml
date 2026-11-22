@@ -1,0 +1,179 @@
+# HanYu — tests à chaque push et pull request ; images + déploiement uniquement sur main.
+name: CI/CD
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# Un seul déploiement à la fois : un nouveau push attend la fin du précédent
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  REGISTRY: ghcr.io/gitjaphet
+
+jobs:
+  # ── 1. Tests du backend, avec un vrai PostgreSQL pour vérifier les migrations ──
+  backend:
+    name: Backend (pytest + migrations)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: hanyu
+          POSTGRES_PASSWORD: hanyu
+          POSTGRES_DB: hanyu
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U hanyu -d hanyu"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://hanyu:hanyu@localhost:5432/hanyu
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Tests
+        run: python -m pytest -v -W error
+      - name: Migrations applicables et à jour des modèles
+        run: |
+          alembic upgrade head
+          alembic check
+      - name: "Import des leçons sur PostgreSQL, deux fois (idempotent)"
+        run: |
+          python -m app.seed.load_lessons
+          python -m app.seed.load_lessons
+
+  # ── 2. Tests du frontend ──
+  frontend:
+    name: Frontend (TypeScript + Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Tests
+        run: npm test
+
+  # ── 3. Images Docker → ghcr.io (seulement sur main, si les tests passent) ──
+  images:
+    name: Images Docker
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: API
+        uses: docker/build-push-action@v7
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/hanyu-api:${{ github.sha }}
+            ${{ env.REGISTRY }}/hanyu-api:latest
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+      - name: Web
+        uses: docker/build-push-action@v7
+        with:
+          context: frontend
+          push: true
+          # Même domaine pour le site et l'API : adresse relative, image indépendante du domaine
+          build-args: NEXT_PUBLIC_API_URL=/api
+          tags: |
+            ${{ env.REGISTRY }}/hanyu-web:${{ github.sha }}
+            ${{ env.REGISTRY }}/hanyu-web:latest
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+  # ── 4. Déploiement sur le VPS, avec retour automatique à la version précédente en cas d'échec ──
+  deploy:
+    name: Déploiement VPS
+    needs: images
+    runs-on: ubuntu-latest
+    environment:
+      name: vps
+      url: https://hanyu.medevstack.com
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Clé SSH de déploiement
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Copie du compose de production
+        run: >-
+          scp -i ~/.ssh/deploy_key -P "${{ secrets.VPS_PORT }}"
+          deploy/compose.prod.yml
+          "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/hanyu/compose.prod.yml"
+
+      - name: Mise à jour des conteneurs
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${{ secrets.VPS_PORT }}" \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "bash -s -- ${{ github.sha }}" <<'SCRIPT'
+          set -euo pipefail
+          NEW_TAG="$1"
+          cd /opt/hanyu
+          compose() { docker compose -f compose.prod.yml "$@"; }
+
+          PREVIOUS_TAG=$(grep '^IMAGE_TAG=' .env | cut -d= -f2)
+          echo "Version actuelle : $PREVIOUS_TAG → nouvelle : $NEW_TAG"
+          sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$NEW_TAG/" .env
+
+          compose pull
+          if compose up -d --remove-orphans --wait --wait-timeout 180; then
+            echo "Déploiement réussi"
+            docker image prune -f
+          else
+            echo "ÉCHEC : retour à la version $PREVIOUS_TAG"
+            compose logs --tail 50 api web || true
+            sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/" .env
+            compose up -d --remove-orphans --wait --wait-timeout 180 || true
+            exit 1
+          fi
+          SCRIPT
+
+      - name: Vérification depuis Internet
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fsS https://hanyu.medevstack.com/api/health; then
+              echo; curl -fsS -o /dev/null -w "Site : HTTP %{http_code}\n" https://hanyu.medevstack.com/
+              exit 0
+            fi
+            echo "Tentative $i/10…"; sleep 6
+          done
+          exit 1

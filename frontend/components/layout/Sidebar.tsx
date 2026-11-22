@@ -9,23 +9,8 @@ import {
   Dumbbell, Gamepad2, GraduationCap // Nouvelles icônes importées
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
-
-const curriculum = [
-  {
-    levelId: "A",
-    label: "Initiation",
-    units: [
-      { id: 1, title: "Les bases" },
-      { id: 2, title: "Se présenter" },
-    ],
-  },
-  {
-    levelId: "B",
-    label: "Intermédiaire",
-    units: [{ id: 1, title: "Au restaurant" }],
-  },
-  { levelId: "C", label: "Avancé", units: [] },
-];
+import { useCurriculum } from "@/hooks/useLessons";
+import { useProgressStore } from "@/store/progressStore";
 
 const mockUser = { initials: "IN", name: "Invité", xp: 15, xpGoal: 50, streak: 3 };
 
@@ -35,6 +20,14 @@ function SidebarContent() {
 
   const currentLevel = searchParams.get("level") ?? "A";
   const currentUnit  = Number(searchParams.get("unit") ?? "1");
+
+  const { data: curriculum } = useCurriculum();
+  const progress = useProgressStore((st) => st.progress);
+  const hydrated = useProgressStore((st) => st.hydrated);
+
+  // Leçons restantes = leçons du cursus dont le quiz n'est pas validé
+  const lessonIds = curriculum.flatMap((lv) => lv.units.flatMap((u) => u.lessonIds));
+  const remaining = lessonIds.filter((id) => !progress[id]?.quizDone).length;
 
   const [lessonsOpen,   setLessonsOpen]   = useState(true);
   const [expandedLevel, setExpandedLevel] = useState<string>(currentLevel);
@@ -67,7 +60,7 @@ function SidebarContent() {
           <div className="flex-1 min-w-0">
             <div className="text-black font-bold text-sm leading-tight truncate">{mockUser.name}</div>
             <div className="text-black/60 text-[12px] mt-0.5 truncate">
-              Niv. {currentLevel} · {curriculum.find(l => l.levelId === currentLevel)?.label}
+              Niv. {currentLevel} · {curriculum.find(l => l.code === currentLevel)?.label}
             </div>
           </div>
           <div className="flex items-center gap-1 bg-black/10 text-black text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0">
@@ -115,16 +108,16 @@ function SidebarContent() {
         <div className={`${styles.subnav} ${lessonsOpen ? styles.subnavOpen : ""}`}>
           <div className={styles.treeRoot}>
             {curriculum.map((lvl) => {
-              const isActiveLevel = currentLevel === lvl.levelId && pathname === "/";
-              const isExpanded    = expandedLevel === lvl.levelId;
+              const isActiveLevel = currentLevel === lvl.code && pathname === "/";
+              const isExpanded    = expandedLevel === lvl.code;
 
               return (
-                <div key={lvl.levelId} className={styles.treeGroup}>
+                <div key={lvl.code} className={styles.treeGroup}>
                   <button
-                    onClick={() => toggleLevel(lvl.levelId)}
+                    onClick={() => toggleLevel(lvl.code)}
                     className={`${styles.levelItem} ${isActiveLevel ? styles.levelItemActive : ""}`}
                   >
-                    <span className={styles.levelLabel}>Niveau {lvl.levelId}</span>
+                    <span className={styles.levelLabel}>Niveau {lvl.code}</span>
                     {lvl.units.length > 0 && (
                       <ChevronRight
                         size={11}
@@ -139,17 +132,17 @@ function SidebarContent() {
                       <div className={styles.unitList}>
                         {lvl.units.map((u) => {
                           const isUnitActive =
-                            currentUnit === u.id &&
-                            currentLevel === lvl.levelId &&
+                            currentUnit === u.number &&
+                            currentLevel === lvl.code &&
                             pathname === "/";
                           return (
                             <Link
-                              key={u.id}
-                              href={`/?level=${lvl.levelId}&unit=${u.id}`}
+                              key={u.number}
+                              href={`/?level=${lvl.code}&unit=${u.number}`}
                               className={`${styles.unitItem} ${isUnitActive ? styles.unitItemActive : ""}`}
                             >
                               <span className={styles.unitDot} />
-                              Unité {u.id}
+                              Unité {u.number}
                             </Link>
                           );
                         })}
@@ -252,7 +245,13 @@ function SidebarContent() {
       <div className="hidden lg:block px-3 py-3 border-t border-border mt-auto">
         <div className="flex items-center gap-2.5 bg-background px-3 py-2.5 rounded-xl border border-border">
           <BarChart2 size={15} className="text-primary flex-shrink-0" />
-          <span className="text-xs font-semibold text-text truncate">36 leçons à compléter</span>
+          <span className="text-xs font-semibold text-text truncate">
+            {!hydrated || lessonIds.length === 0
+              ? "Chargement…"
+              : remaining === 0
+                ? "Toutes les leçons terminées 🎉"
+                : `${remaining} leçon${remaining > 1 ? "s" : ""} à compléter`}
+          </span>
         </div>
       </div>
 

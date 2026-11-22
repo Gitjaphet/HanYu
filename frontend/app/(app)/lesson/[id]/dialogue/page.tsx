@@ -3,7 +3,9 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { MOCK_LESSONS } from "@/lib/constants";
+import { useLesson } from "@/hooks/useLessons";
+import { useProgressStore } from "@/store/progressStore";
+import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
 import { DialogueLine } from "@/types";
 import { ChevronLeft, ChevronRight, Volume2, Mic, MicOff, RotateCcw, CheckCircle2, MessageSquare } from "lucide-react";
 import PandaMascot, { PandaState } from "@/components/lesson/PandaMascot/PandaMascot";
@@ -16,9 +18,10 @@ type MicState = "idle" | "listening" | "success" | "fail";
 type Phase    = "discovery" | "practice";
 
 export default function DialoguePage() {
-  const params  = useParams();
+  const params = useParams<{ id: string }>();
   const router  = useRouter();
-  const lesson  = MOCK_LESSONS.find((l) => l.id === parseInt(params.id as string, 10));
+  const { lesson, loading, error } = useLesson(Number(params.id));
+  const completeDialogue = useProgressStore((s) => s.completeDialogue);
 
   const dialogue: DialogueLine[] = lesson?.dialogue ?? [];
 
@@ -204,7 +207,7 @@ export default function DialoguePage() {
 
     return () => { cancelledRef.current = true; window.speechSynthesis?.cancel(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, dialogue.length]);
 
   // ─── PHASE PRACTICE ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -244,18 +247,13 @@ export default function DialoguePage() {
 
     const isLast = practiceIdx === dialogue.length - 1;
     if (isLast) {
-      const stored = localStorage.getItem(`lesson_progress_${lesson?.id}`);
-      const prev   = stored ? JSON.parse(stored) : {};
-      localStorage.setItem(
-        `lesson_progress_${lesson?.id}`,
-        JSON.stringify({ ...prev, dialogueDone: true })
-      );
+      if (lesson) completeDialogue(lesson.id);
       router.push(`/lesson/${lesson?.id}/quiz`);
     } else {
       cancelledRef.current = false;
       setPracticeIdx((i) => i + 1);
     }
-  }, [practiceIdx, dialogue.length, lesson?.id, router, stopListening]);
+  }, [practiceIdx, dialogue.length, lesson, completeDialogue, router, stopListening]);
 
   const handleRetry = useCallback(async () => {
     setAttempts(0);
@@ -267,12 +265,9 @@ export default function DialoguePage() {
   }, [currentLine, speakInstruction, startListening]);
 
   // ─── Garde ────────────────────────────────────────────────────────────────
+  if (loading) return <LessonLoading />;
   if (!lesson || dialogue.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-[100dvh]">
-        <p className="text-text-muted font-bold">Leçon introuvable.</p>
-      </div>
-    );
+    return <LessonUnavailable error={error} />;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
