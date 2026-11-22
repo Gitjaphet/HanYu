@@ -120,7 +120,7 @@ jobs:
     needs: images
     runs-on: ubuntu-latest
     environment:
-      name: production
+      name: vps
       url: https://hanyu.medevstack.com
     steps:
       - uses: actions/checkout@v7
