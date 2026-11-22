@@ -151,17 +151,20 @@ jobs:
           compose() { docker compose -f compose.prod.yml "$@"; }
 
           PREVIOUS_TAG=$(grep '^IMAGE_TAG=' .env | cut -d= -f2)
-          echo "Version actuelle : $PREVIOUS_TAG → nouvelle : $NEW_TAG"
-          sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$NEW_TAG/" .env
+          echo "Version en service : $PREVIOUS_TAG → nouvelle : $NEW_TAG"
 
+          # La nouvelle version n'est inscrite dans .env qu'une fois démarrée et en bonne santé.
+          # (Une variable exportée a priorité sur .env pour docker compose.)
+          export IMAGE_TAG="$NEW_TAG"
           compose pull
           if compose up -d --remove-orphans --wait --wait-timeout 180; then
+            sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$NEW_TAG/" .env
             echo "Déploiement réussi"
             docker image prune -f
           else
             echo "ÉCHEC : retour à la version $PREVIOUS_TAG"
             compose logs --tail 50 api web || true
-            sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/" .env
+            export IMAGE_TAG="$PREVIOUS_TAG"
             compose up -d --remove-orphans --wait --wait-timeout 180 || true
             exit 1
           fi
