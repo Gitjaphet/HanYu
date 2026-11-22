@@ -80,3 +80,21 @@ export function parseLegacyProgress(entries: Array<[string, string | null]>): Pr
   }
   return result;
 }
+
+/** Nombre de leçons terminées sur un ensemble de leçons. */
+export function countDone(lessons: Lesson[], progress: ProgressMap): number {
+  return lessons.filter((l) => progress[l.id]?.quizDone).length;
+}
+
+/**
+ * Leçon à reprendre : la première, dans l'ordre du cursus, qui est commencée
+ * ou disponible. null si tout est terminé (ou rien n'est chargé).
+ */
+export function nextLesson(lessons: Lesson[], progress: ProgressMap): Lesson | null {
+  return (
+    lessons.find((l) => {
+      const status = lessonStatus(lessons, progress, l.id);
+      return status === "in-progress" || status === "available";
+    }) ?? null
+  );
+}
