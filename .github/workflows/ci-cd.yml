@@ -148,6 +148,10 @@ jobs:
           set -euo pipefail
           NEW_TAG="$1"
           cd /opt/hanyu
+          # Images publiques : HanYu utilise sa propre configuration Docker, sans aucun identifiant,
+          # pour ne jamais dépendre du jeton ghcr.io d'un autre projet du VPS.
+          export DOCKER_CONFIG=/opt/hanyu/.docker
+          mkdir -p "$DOCKER_CONFIG"
           compose() { docker compose -f compose.prod.yml "$@"; }
 
           PREVIOUS_TAG=$(grep '^IMAGE_TAG=' .env | cut -d= -f2)
