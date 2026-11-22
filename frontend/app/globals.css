@@ -1,59 +1,81 @@
 @import "tailwindcss";
 
-/* ── Variables manquantes ── */
+/* ══════════════════════════════════════════════
+   Palette « Lavande » (inspiration Learnthru)
+   Les noms restent ceux déjà utilisés par les composants
+   (bg-card, text-text, bg-primary…) : changer une valeur ici
+   change toute l'application.
+   ══════════════════════════════════════════════ */
 @theme {
-  /* déjà présents */
-  --color-background: #F8F9FA;
+  /* Fonds */
+  --color-background: #EEF0F5;
+  --color-background-muted: #F1F3FA;
   --color-card: #FFFFFF;
-  --color-text: #1E293B;
-  --color-text-muted: #64748B;
-  --color-primary: #FF5A36;
-  --color-secondary: #0D3B4A;
-  --color-tertiary: #2EC4A9;
-  --color-border: #E2E8F0;
+  --color-tint: #E3E7F6;
+  --color-border: #E1E4EE;
 
-  /* ── AJOUTS nécessaires pour LessonCard ── */
-  --color-primary-dark: #e04420;
-  --color-navy: #0D3B4A;
-  --color-background-muted: #F1F5F9;
+  /* Texte */
+  --color-text: #2F3558;
+  --color-text-muted: #62688A;
+  --color-navy: #2F3558;
 
+  /* Couleurs de marque */
+  --color-primary: #5A69B0;
+  --color-primary-dark: #4A58A0;
+  --color-secondary: #3F4F9E;
+  --color-tertiary: #2E9E8A;
+  --color-accent: #C2414B;
+
+  /* Formes et ombres */
   --radius-lg: 20px;
   --radius-md: 12px;
+  --shadow-hover: 0 16px 40px rgba(47, 53, 88, 0.14);
+  --shadow-primary: 0 7px 22px rgba(90, 105, 176, 0.40);
 
-  --shadow-hover: 0 16px 40px rgba(13, 59, 74, 0.14);
-  --shadow-primary: 0 7px 22px rgba(255, 90, 54, 0.50);
-
+  /* Animations */
   --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* ── Police hanzi ── */
+  /* Polices */
+  --font-sans: var(--font-mulish), system-ui, sans-serif;
   --font-hanzi: var(--font-noto-serif-sc), serif;
-  --font-sans: var(--font-josefin-sans), sans-serif;
 }
 
-/* ── APRÈS le bloc @theme { } ── */
+/* ══ Mode sombre ══
+   Activé par l'attribut data-theme="dark" sur <html>,
+   posé avant l'affichage par le script de app/layout.tsx. */
+[data-theme="dark"] {
+  --color-background: #151829;
+  --color-background-muted: #262B45;
+  --color-card: #1F2338;
+  --color-tint: #2C3360;
+  --color-border: #2E3452;
 
-:root {
-  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --radius-lg: 20px;
-  --radius-md: 12px;
-  --shadow-hover: 0 16px 40px rgba(13, 59, 74, 0.14);
-  --shadow-primary: 0 7px 22px rgba(255, 90, 54, 0.50);
-  --color-navy: #0D3B4A;
-  --font-hanzi: var(--font-noto-serif-sc), serif;
-  --font-sans: var(--font-josefin-sans), sans-serif;
+  --color-text: #E8EAF6;
+  --color-text-muted: #A4A9C8;
+  --color-navy: #C9CEF0;
+
+  --color-primary: #7584DA;
+  --color-primary-dark: #8F9CE6;
+  --color-secondary: #5361B0;
+  --color-tertiary: #5FC8B4;
+  --color-accent: #F4A0A6;
+
+  --shadow-hover: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --shadow-primary: 0 7px 22px rgba(117, 132, 218, 0.35);
+
+  /* Barres de défilement et champs natifs du navigateur en sombre */
+  color-scheme: dark;
 }
 
-/* Application des variables au document global */
 body {
   background-color: var(--color-background);
   color: var(--color-text);
-  font-family: var(--font-josefin-sans), sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
-/* Utilitaire pour cacher les barres de défilement (scrollbars) sur les menus, tout en gardant le scroll */
+/* Cache les barres de défilement tout en gardant le défilement */
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -61,24 +83,3 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-
-
-
-
-/* Application des variables au document global */
-body {
-  background-color: var(--color-background);
-  color: var(--color-text);
-  font-family: var(--font-josefin-sans), sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* Utilitaire pour cacher les barres de défilement (scrollbars) sur les menus, tout en gardant le scroll */
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-

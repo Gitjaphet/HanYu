@@ -4,6 +4,7 @@ import {
   Settings, Hammer, User, Bell, Moon, Globe, 
   CreditCard, ChevronRight, Volume2, Shield 
 } from "lucide-react";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export default function SettingsPage() {
   return (
@@ -30,6 +31,20 @@ export default function SettingsPage() {
           Ton centre de contrôle est en cours de montage ! <br className="hidden sm:block" />
           Tu pourras bientôt y personnaliser ton interface, gérer tes notifications et sécuriser ton compte.
         </p>
+      </div>
+
+      {/* ── Apparence (déjà fonctionnel) ── */}
+      <div className="mb-10">
+        <h2 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-3 ml-2">
+          Apparence
+        </h2>
+        <div className="bg-card border-2 border-border rounded-2xl p-4 shadow-sm flex items-center justify-between gap-4">
+          <div>
+            <p className="font-bold text-text">Thème</p>
+            <p className="text-sm text-text-muted">Clair ou sombre. Par défaut, HanYu suit le réglage de ton appareil.</p>
+          </div>
+          <ThemeToggle withLabel />
+        </div>
       </div>
 
       {/* ── Aperçu des paramètres (Flouté/Grisé) ── */}

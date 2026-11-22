@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Josefin_Sans, Noto_Serif_SC } from "next/font/google";
+import { Mulish, Noto_Serif_SC } from "next/font/google";
 import "./globals.css";
 import { SessionLoader } from "@/components/providers/SessionLoader";
+import { themeScript } from "@/lib/theme";
 
-// 1. Josefin Sans — police principale de l'interface
-const josefinSans = Josefin_Sans({ 
-  subsets: ["latin"], 
-  variable: "--font-josefin-sans",
-  weight: ["300", "400", "500", "600", "700"],
+// 1. Mulish — police principale de l'interface
+const mulish = Mulish({
+  subsets: ["latin"],
+  variable: "--font-mulish", // police variable : toutes les graisses
 });
 
 // 2. Noto Serif SC — pour les caractères chinois
@@ -28,8 +28,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr">
-      <body className={`${josefinSans.variable} ${notoSerifSC.variable} antialiased`}>
+    // suppressHydrationWarning : data-theme est posé par le script avant React
+    <html lang="fr" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className={`${mulish.variable} ${notoSerifSC.variable} antialiased`}>
         <SessionLoader />
         {children}
       </body>

@@ -12,6 +12,7 @@ import styles from "./Sidebar.module.css";
 import { useCurriculum } from "@/hooks/useLessons";
 import { useProgressStore } from "@/store/progressStore";
 import { useUserStore } from "@/store/userStore";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 // XP et série : fictifs jusqu'à la gamification côté serveur
 const mockUser = { xp: 15, xpGoal: 50, streak: 3 };
@@ -49,12 +50,15 @@ function SidebarContent() {
 
       {/* ══ LOGO ══ */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-[#FF8A66] flex items-center justify-center flex-shrink-0 shadow-sm">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center flex-shrink-0 shadow-sm">
           <span className="text-white font-bold text-xl font-noto-serif-sc leading-none">语</span>
         </div>
         <div className="leading-tight">
           <div className="text-base font-extrabold text-text tracking-tight">HanYu</div>
           <div className="text-[10px] text-text-muted font-bold uppercase tracking-widest mt-0.5">Mandarin</div>
+        </div>
+        <div className="ml-auto">
+          <ThemeToggle />
         </div>
       </div>
 

@@ -81,7 +81,7 @@
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--color-primary);
-  font-family: var(--font-josefin-sans), sans-serif;
+  font-family: var(--font-mulish), sans-serif;
   margin-bottom: 2px;
 }
 
@@ -108,7 +108,7 @@
 .heroTitleOutline {
   font-size: clamp(32px, 4vw, 50px);
   font-weight: 700;
-  font-family: var(--font-josefin-sans), sans-serif;
+  font-family: var(--font-mulish), sans-serif;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--color-text);
@@ -118,7 +118,7 @@
 .heroTitleSolid {
   font-size: clamp(52px, 7vw, 80px);
   font-weight: 900;
-  font-family: var(--font-josefin-sans), sans-serif;
+  font-family: var(--font-mulish), sans-serif;
   letter-spacing: 0.06em;
   color: var(--color-primary);
   text-transform: uppercase;
@@ -128,7 +128,7 @@
 .heroSub {
   font-size: 15px;
   color: var(--color-text-muted);
-  font-family: var(--font-josefin-sans), sans-serif;
+  font-family: var(--font-mulish), sans-serif;
   font-weight: 400;
   margin: 2px 0 0;
   letter-spacing: 0.01em;
@@ -167,7 +167,7 @@
   text-transform: uppercase;
   color: var(--color-text-muted);
   margin-bottom: 6px;
-  font-family: var(--font-josefin-sans), sans-serif;
+  font-family: var(--font-mulish), sans-serif;
 }
 
 .xpValue {
@@ -175,7 +175,7 @@
   font-size: 29px;
   font-weight: 900;
   color: var(--color-primary);
-  font-family: var(--font-josefin-sans), sans-serif;
+  font-family: var(--font-mulish), sans-serif;
   line-height: 1;
   margin-bottom: 10px;
 }
@@ -223,7 +223,7 @@
   color: #fff;
   font-size: 17px;
   font-weight: 800;
-  font-family: var(--font-josefin-sans), sans-serif;
+  font-family: var(--font-mulish), sans-serif;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -234,7 +234,7 @@
 .unitTitle {
   font-size: 24px;
   font-weight: 800;
-  font-family: var(--font-josefin-sans), sans-serif;
+  font-family: var(--font-mulish), sans-serif;
   color: var(--color-text);
   margin: 0;
   line-height: 1.1;
@@ -244,7 +244,7 @@
 .unitSub {
   font-size: 16px;
   color: var(--color-text-muted);
-  font-family: var(--font-josefin-sans), sans-serif;
+  font-family: var(--font-mulish), sans-serif;
   margin: 2px 0 0;
   font-weight: 400;
 }
@@ -268,7 +268,7 @@
 .emptyTitle {
   font-size: 21px;
   font-weight: 800;
-  font-family: var(--font-josefin-sans), sans-serif;
+  font-family: var(--font-mulish), sans-serif;
   color: var(--color-text);
   margin: 0 0 6px;
 }
@@ -276,7 +276,7 @@
 .emptySub {
   font-size: 15px;
   color: var(--color-text-muted);
-  font-family: var(--font-josefin-sans), sans-serif;
+  font-family: var(--font-mulish), sans-serif;
   margin: 0;
 }
 
