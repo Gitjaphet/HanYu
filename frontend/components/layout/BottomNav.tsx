@@ -110,7 +110,7 @@ function BottomNavContent() {
       </div>
 
       {/* ── WRAPPER BOTTOM NAV AVEC INDICATEUR DE SCROLL ── */}
-      <div className="md:hidden fixed bottom-0 left-0 w-full bg-card border-t border-border z-40">
+      <div className="lg:hidden fixed bottom-0 left-0 w-full bg-card border-t border-border z-40">
         
         {/* Navigation scrollable horizontalement */}
         <nav 
@@ -234,7 +234,7 @@ export function BottomNav() {
   return (
     <Suspense
       fallback={
-        <nav className="md:hidden fixed bottom-0 left-0 w-full h-16 bg-card border-t border-border z-50" />
+        <nav className="lg:hidden fixed bottom-0 left-0 w-full h-16 bg-card border-t border-border z-50" />
       }
     >
       <BottomNavContent />

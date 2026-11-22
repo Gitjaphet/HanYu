@@ -20,7 +20,7 @@
   padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .nav { display: none; }
 }
 
@@ -357,7 +357,7 @@
 }
 
 /* ── Desktop : masquer tout le drawer ── */
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .drawer,
   .backdrop { display: none !important; }
 }

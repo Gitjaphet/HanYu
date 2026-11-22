@@ -1,291 +1,179 @@
 "use client";
 
-import { useState, Suspense, useEffect } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
-  BookOpen, Trophy, User, Settings,
-  ChevronRight, Zap, BarChart2,
-  Dumbbell, Gamepad2, GraduationCap // Nouvelles icônes importées
+  BookOpen, ChevronDown, Dumbbell, Gamepad2, LogIn, LogOut,
+  Settings, Trophy, User, type LucideIcon,
 } from "lucide-react";
-import styles from "./Sidebar.module.css";
 import { useCurriculum } from "@/hooks/useLessons";
-import { useProgressStore } from "@/store/progressStore";
 import { useUserStore } from "@/store/userStore";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
-// XP et série : fictifs jusqu'à la gamification côté serveur
-const mockUser = { xp: 15, xpGoal: 50, streak: 3 };
+// Largeur partagée avec le layout (marge du contenu principal)
+export const SIDEBAR_WIDTH = "w-64";
+
+const itemBase =
+  "flex items-center gap-3.5 w-full px-3.5 py-3 rounded-xl text-[15px] transition-colors";
+const itemIdle = "text-text-muted font-bold hover:bg-background hover:text-text";
+const itemActive = "bg-tint text-text font-extrabold";
+
+function NavLink({ href, icon: Icon, label, active }: {
+  href: string; icon: LucideIcon; label: string; active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={`${itemBase} ${active ? itemActive : itemIdle}`}
+    >
+      <Icon size={20} strokeWidth={2} className={active ? "text-primary" : ""} />
+      {label}
+    </Link>
+  );
+}
 
 function SidebarContent() {
-  const pathname     = usePathname();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-
   const currentLevel = searchParams.get("level") ?? "A";
-  const currentUnit  = Number(searchParams.get("unit") ?? "1");
+  const currentUnit = Number(searchParams.get("unit") ?? "1");
+  const onLessons = pathname === "/";
 
   const { data: curriculum } = useCurriculum();
   const account = useUserStore((st) => st.user);
   const accountStatus = useUserStore((st) => st.status);
   const logout = useUserStore((st) => st.logout);
-  const displayName = account?.pseudo ?? "Invité";
-  const initials = displayName.slice(0, 2).toUpperCase();
-  const progress = useProgressStore((st) => st.progress);
-  const hydrated = useProgressStore((st) => st.hydrated);
 
-  // Leçons restantes = leçons du cursus dont le quiz n'est pas validé
-  const lessonIds = curriculum.flatMap((lv) => lv.units.flatMap((u) => u.lessonIds));
-  const remaining = lessonIds.filter((id) => !progress[id]?.quizDone).length;
-
-  const [lessonsOpen,   setLessonsOpen]   = useState(true);
-  const [expandedLevel, setExpandedLevel] = useState<string>(currentLevel);
-
-  useEffect(() => { setExpandedLevel(currentLevel); }, [currentLevel]);
-
-  const isActive    = (href: string) => pathname === href;
-  const toggleLevel = (id: string)   => setExpandedLevel(p => p === id ? "" : id);
+  const [lessonsOpen, setLessonsOpen] = useState(true);
+  const [expandedLevel, setExpandedLevel] = useState(currentLevel);
+  // Quand l'URL change de niveau, on déplie ce niveau (ajustement pendant le rendu,
+  // recommandé par React plutôt qu'un useEffect)
+  const [seenLevel, setSeenLevel] = useState(currentLevel);
+  if (seenLevel !== currentLevel) {
+    setSeenLevel(currentLevel);
+    setExpandedLevel(currentLevel);
+  }
 
   return (
-    <aside className={`hidden lg:flex flex-col w-64 h-screen bg-card fixed left-0 top-0 border-r border-border z-50 ${styles.sidebar}`}>
-
-      {/* ══ LOGO ══ */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center flex-shrink-0 shadow-sm">
-          <span className="text-white font-bold text-xl font-noto-serif-sc leading-none">语</span>
-        </div>
-        <div className="leading-tight">
-          <div className="text-base font-extrabold text-text tracking-tight">HanYu</div>
-          <div className="text-[10px] text-text-muted font-bold uppercase tracking-widest mt-0.5">Mandarin</div>
-        </div>
-        <div className="ml-auto">
-          <ThemeToggle />
-        </div>
+    <aside
+      aria-label="Menu principal"
+      className={`hidden lg:flex flex-col ${SIDEBAR_WIDTH} h-screen fixed left-0 top-0 z-40 bg-card border-r border-border px-4 py-6`}
+    >
+      {/* ── Logo + thème ── */}
+      <div className="flex items-center justify-between px-2 mb-8">
+        <Link href="/" className="flex items-center gap-3">
+          <span className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-hanzi text-xl font-bold">
+            语
+          </span>
+          <span className="text-xl font-extrabold text-text">HanYu</span>
+        </Link>
+        <ThemeToggle />
       </div>
 
-      {/* ══ USER CARD ══ */}
-      <div className={`mx-3 mt-3 mb-1 p-4 ${styles.userCard}`}>
-        <div className={styles.userCardBg}>汉</div>
-
-        <div className="flex items-center gap-3 mb-3.5 relative z-10">
-          <div className={styles.avatar}>{initials}</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-black font-bold text-sm leading-tight truncate">{displayName}</div>
-            <div className="text-black/60 text-[12px] mt-0.5 truncate">
-              Niv. {currentLevel} · {curriculum.find(l => l.code === currentLevel)?.label}
-            </div>
-          </div>
-          <div className="flex items-center gap-1 bg-black/10 text-black text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0">
-            <Zap size={16} className="text-[orange]" />
-            {mockUser.streak}
-          </div>
-        </div>
-
-        <div className="relative z-10">
-          <div className="flex justify-between text-[10px] font-semibold text-black/50 mb-1.5 uppercase tracking-wider">
-            <span>Progression</span>
-            <span>{mockUser.xp} / {mockUser.xpGoal} XP</span>
-          </div>
-          <div className={styles.xpTrack}>
-            <div className={styles.xpFill} style={{ width: `${Math.min((mockUser.xp / mockUser.xpGoal) * 100, 100)}%` }} />
-          </div>
-        </div>
-
-        {accountStatus !== "loading" && (
-          <div className="relative z-10 mt-3 text-[12px] font-bold">
-            {account ? (
-              <button onClick={() => void logout()} className="text-black/60 hover:text-black underline-offset-2 hover:underline">
-                Se déconnecter
-              </button>
-            ) : (
-              <Link href="/login" className="text-primary hover:underline underline-offset-2">
-                Se connecter / Créer un compte
-              </Link>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ══ NAV ══ */}
-      <nav className={`${styles.nav} flex-1 px-3 pt-4 overflow-y-auto pb-4`}>
-
-        {/* — Apprentissage — */}
-        <p className={styles.sectionLabel}>Apprentissage</p>
-
-        {/* Leçons */}
+      {/* ── Menu ── */}
+      <nav className="flex-1 overflow-y-auto hide-scrollbar flex flex-col gap-1.5">
         <button
-          onClick={() => setLessonsOpen(!lessonsOpen)}
-          className={`${styles.navItem} ${pathname === "/" ? styles.navItemActive : ""}`}
+          type="button"
+          onClick={() => setLessonsOpen((o) => !o)}
+          aria-expanded={lessonsOpen}
+          className={`${itemBase} ${onLessons ? itemActive : itemIdle}`}
         >
-          <div className="flex items-center gap-3">
-            <div className={styles.iconBox}>
-              <BookOpen size={16} strokeWidth={1.9} />
-            </div>
-            <span>Leçons</span>
-          </div>
-          <ChevronRight
-            size={13}
-            strokeWidth={2.5}
-            className={`${styles.chevron} ${lessonsOpen ? styles.chevronOpen : ""}`}
-          />
+          <BookOpen size={20} strokeWidth={2} className={onLessons ? "text-primary" : ""} />
+          <span className="flex-1 text-left">Leçons</span>
+          <ChevronDown size={16} className={`transition-transform ${lessonsOpen ? "rotate-180" : ""}`} />
         </button>
 
-        {/* Accordion niveaux */}
-        <div className={`${styles.subnav} ${lessonsOpen ? styles.subnavOpen : ""}`}>
-          <div className={styles.treeRoot}>
+        {/* Arbre Niveaux → Unités */}
+        {lessonsOpen && (
+          <div className="ml-6 pl-3 border-l-2 border-border flex flex-col gap-0.5 mb-2">
             {curriculum.map((lvl) => {
-              const isActiveLevel = currentLevel === lvl.code && pathname === "/";
-              const isExpanded    = expandedLevel === lvl.code;
-
+              const expanded = expandedLevel === lvl.code;
               return (
-                <div key={lvl.code} className={styles.treeGroup}>
+                <div key={lvl.code}>
                   <button
-                    onClick={() => toggleLevel(lvl.code)}
-                    className={`${styles.levelItem} ${isActiveLevel ? styles.levelItemActive : ""}`}
+                    type="button"
+                    onClick={() => setExpandedLevel(expanded ? "" : lvl.code)}
+                    aria-expanded={expanded}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-bold text-text text-left hover:bg-background"
                   >
-                    <span className={styles.levelLabel}>Niveau {lvl.code}</span>
+                    <span className="flex-1 min-w-0 truncate">
+                      Niveau {lvl.code}
+                      <span className="ml-1.5 font-semibold text-text-muted">{lvl.label}</span>
+                    </span>
                     {lvl.units.length > 0 && (
-                      <ChevronRight
-                        size={11}
-                        strokeWidth={2.5}
-                        className={`${styles.chevronSm} ${isExpanded ? styles.chevronSmOpen : ""}`}
-                      />
+                      <ChevronDown size={14} className={`text-text-muted transition-transform ${expanded ? "rotate-180" : ""}`} />
                     )}
                   </button>
 
-                  {lvl.units.length > 0 && (
-                    <div className={`${styles.unitAccordion} ${isExpanded ? styles.unitAccordionOpen : ""}`}>
-                      <div className={styles.unitList}>
-                        {lvl.units.map((u) => {
-                          const isUnitActive =
-                            currentUnit === u.number &&
-                            currentLevel === lvl.code &&
-                            pathname === "/";
-                          return (
-                            <Link
-                              key={u.number}
-                              href={`/?level=${lvl.code}&unit=${u.number}`}
-                              className={`${styles.unitItem} ${isUnitActive ? styles.unitItemActive : ""}`}
-                            >
-                              <span className={styles.unitDot} />
-                              Unité {u.number}
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  {expanded && lvl.units.map((u) => {
+                    const active = onLessons && currentLevel === lvl.code && currentUnit === u.number;
+                    return (
+                      <Link
+                        key={u.number}
+                        href={`/?level=${lvl.code}&unit=${u.number}`}
+                        aria-current={active ? "page" : undefined}
+                        className={`flex items-center gap-2 pl-5 pr-2.5 py-1.5 rounded-lg text-sm ${
+                          active ? "text-primary font-extrabold" : "text-text-muted font-semibold hover:text-text"
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${active ? "bg-primary" : "bg-border"}`} />
+                        <span className="truncate" title={u.title}>Unité {u.number} · {u.title}</span>
+                      </Link>
+                    );
+                  })}
                 </div>
               );
             })}
           </div>
-        </div>
+        )}
 
-        {/* Exercices */}
-        <Link
-          href="/exercices"
-          className={`${styles.navItem} mt-1 ${isActive("/exercices") ? styles.navItemActive : ""}`}
-        >
-          <div className="flex items-center gap-3">
-            <div className={styles.iconBox}>
-              <Dumbbell size={16} strokeWidth={1.9} />
-            </div>
-            <span>Exercices</span>
-          </div>
-        </Link>
-
-        {/* Jeux (Nouveau menu) */}
-        <Link
-          href="/jeux"
-          className={`${styles.navItem} mt-1 ${isActive("/jeux") ? styles.navItemActive : ""}`}
-        >
-          <div className="flex items-center gap-3">
-            <div className={styles.iconBox}>
-              <Gamepad2 size={16} strokeWidth={1.9} />
-            </div>
-            <span>Jeux</span>
-          </div>
-        </Link>
-
-        {/* — Évaluation — */}
-        <p className={`${styles.sectionLabel} mt-5`}>Évaluation</p>
-
-        <Link
-          href="/examen"
-          className={`${styles.navItem} ${isActive("/examen") ? styles.navItemActive : ""}`}
-        >
-          <div className="flex items-center gap-3">
-            <div className={styles.iconBox}>
-              <GraduationCap size={16} strokeWidth={1.9} />
-            </div>
-            <span>Examens</span>
-          </div>
-        </Link>
-
-        {/* — Communauté — */}
-        <p className={`${styles.sectionLabel} mt-5`}>Communauté</p>
-
-        <Link
-          href="/leaderboard"
-          className={`${styles.navItem} ${isActive("/leaderboard") ? styles.navItemActive : ""}`}
-        >
-          <div className="flex items-center gap-3">
-            <div className={styles.iconBox}>
-              <Trophy size={16} strokeWidth={1.9} />
-            </div>
-            <span>Classement</span>
-          </div>
-          <span className={styles.badge}>TOP 10</span>
-        </Link>
-
-        {/* — Compte — */}
-        <p className={`${styles.sectionLabel} mt-5`}>Compte</p>
-
-        <Link
-          href="/profile"
-          className={`${styles.navItem} ${isActive("/profile") ? styles.navItemActive : ""}`}
-        >
-          <div className="flex items-center gap-3">
-            <div className={styles.iconBox}>
-              <User size={16} strokeWidth={1.9} />
-            </div>
-            <span>Profil</span>
-          </div>
-        </Link>
-
-        <Link
-          href="/settings"
-          className={`${styles.navItem} mt-1 ${isActive("/settings") ? styles.navItemActive : ""}`}
-        >
-          <div className="flex items-center gap-3">
-            <div className={styles.iconBox}>
-              <Settings size={16} strokeWidth={1.9} />
-            </div>
-            <span>Paramètres</span>
-          </div>
-        </Link>
-
+        <NavLink href="/exercices" icon={Dumbbell} label="Exercices" active={pathname === "/exercices"} />
+        <NavLink href="/jeux" icon={Gamepad2} label="Jeux" active={pathname.startsWith("/jeux")} />
+        <NavLink href="/leaderboard" icon={Trophy} label="Classement" active={pathname === "/leaderboard"} />
+        <NavLink href="/profile" icon={User} label="Profil" active={pathname === "/profile"} />
+        <NavLink href="/settings" icon={Settings} label="Paramètres" active={pathname === "/settings"} />
       </nav>
 
-      {/* ══ FOOTER NETTOYÉ ══ */}
-      <div className="hidden lg:block px-3 py-3 border-t border-border mt-auto">
-        <div className="flex items-center gap-2.5 bg-background px-3 py-2.5 rounded-xl border border-border">
-          <BarChart2 size={15} className="text-primary flex-shrink-0" />
-          <span className="text-xs font-semibold text-text truncate">
-            {!hydrated || lessonIds.length === 0
-              ? "Chargement…"
-              : remaining === 0
-                ? "Toutes les leçons terminées 🎉"
-                : `${remaining} leçon${remaining > 1 ? "s" : ""} à compléter`}
-          </span>
+      {/* ── Compte ── */}
+      {accountStatus !== "loading" && (
+        <div className="mt-4 rounded-2xl bg-background p-3 flex items-center gap-3">
+          {account ? (
+            <>
+              <span className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/40 to-accent/40 flex items-center justify-center text-sm font-extrabold text-text shrink-0">
+                {account.pseudo.slice(0, 2).toUpperCase()}
+              </span>
+              <span className="flex-1 min-w-0 text-sm font-extrabold text-text truncate">{account.pseudo}</span>
+              <button
+                type="button"
+                onClick={() => void logout()}
+                aria-label="Se déconnecter"
+                title="Se déconnecter"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:bg-card hover:text-text"
+              >
+                <LogOut size={18} />
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary text-white text-sm font-extrabold py-2.5 hover:bg-primary-dark"
+            >
+              <LogIn size={17} />
+              Se connecter
+            </Link>
+          )}
         </div>
-      </div>
-
+      )}
     </aside>
   );
 }
 
-export const Sidebar = () => (
-  <Suspense fallback={<div className="hidden md:block w-64 h-screen bg-card fixed left-0 top-0 border-r border-border z-50" />}>
-    <SidebarContent />
-  </Suspense>
-);
+export function Sidebar() {
+  return (
+    <Suspense fallback={<div className={`hidden lg:block ${SIDEBAR_WIDTH} h-screen fixed left-0 top-0 bg-card border-r border-border`} />}>
+      <SidebarContent />
+    </Suspense>
+  );
+}
