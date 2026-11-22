@@ -3,6 +3,7 @@ import { Mulish, Noto_Serif_SC } from "next/font/google";
 import "./globals.css";
 import { SessionLoader } from "@/components/providers/SessionLoader";
 import { themeScript } from "@/lib/theme";
+import { SmoothScroll } from "@/components/providers/SmoothScroll";
 
 // 1. Mulish — police principale de l'interface
 const mulish = Mulish({
@@ -35,7 +36,7 @@ export default function RootLayout({
       </head>
       <body className={`${mulish.variable} ${notoSerifSC.variable} antialiased`}>
         <SessionLoader />
-        {children}
+        <SmoothScroll>{children}</SmoothScroll>
       </body>
     </html>
   );

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "motion/react";
 import { NAV_ITEMS } from "./navItems";
 
 /** Barre de navigation du bas, affichée sous 1024 px. */
@@ -21,12 +22,15 @@ export function BottomNav() {
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
-            className={`flex flex-col items-center gap-1 py-1 text-[11px] ${
+            className={`flex flex-col items-center gap-1 py-1 text-[11px] transition-colors duration-200 active:scale-95 ${
               active ? "text-primary font-extrabold" : "text-text-muted font-bold"
             }`}
           >
-            <span className={`w-11 h-8 rounded-xl flex items-center justify-center ${active ? "bg-tint" : ""}`}>
-              <Icon size={20} strokeWidth={2} aria-hidden="true" />
+            <span className="relative w-11 h-8 rounded-xl flex items-center justify-center">
+              {active && (
+                <motion.span layoutId="bottomnav-active" aria-hidden="true" className="absolute inset-0 rounded-xl bg-tint" />
+              )}
+              <Icon size={20} strokeWidth={2} aria-hidden="true" className="relative" />
             </span>
             {label}
           </Link>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogIn, LogOut } from "lucide-react";
+import { motion } from "motion/react";
 import { useUserStore } from "@/store/userStore";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { NAV_ITEMS } from "./navItems";
@@ -36,14 +37,15 @@ export function Sidebar() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] transition-colors ${
-                active
-                  ? "bg-tint text-text font-extrabold"
-                  : "text-text-muted font-bold hover:bg-background hover:text-text"
+              className={`relative flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] transition-colors duration-200 ${
+                active ? "text-text font-extrabold" : "text-text-muted font-bold hover:bg-background hover:text-text"
               }`}
             >
-              <Icon size={20} strokeWidth={2} aria-hidden="true" className={active ? "text-primary" : ""} />
-              {label}
+              {active && (
+                <motion.span layoutId="sidebar-active" aria-hidden="true" className="absolute inset-0 rounded-xl bg-tint" />
+              )}
+              <Icon size={20} strokeWidth={2} aria-hidden="true" className={`relative ${active ? "text-primary" : ""}`} />
+              <span className="relative">{label}</span>
             </Link>
           );
         })}

@@ -1,12 +1,14 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { Play } from "lucide-react";
+import { motion } from "motion/react";
 import { useCurriculum, useLessons } from "@/hooks/useLessons";
 import { useProgressStore } from "@/store/progressStore";
 import { countDone, nextLesson } from "@/lib/progress";
-import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
+import { LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
+import { LessonsSkeleton } from "@/components/lessons/LessonsSkeleton";
 import { LevelTabs } from "@/components/lessons/LevelTabs";
 import { UnitSection } from "@/components/lessons/UnitSection";
 
@@ -21,7 +23,14 @@ export default function LessonsPage({
   const progress = useProgressStore((s) => s.progress);
   const hydrated = useProgressStore((s) => s.hydrated);
 
-  if (loading || curriculum.loading || !hydrated) return <LessonLoading label="Chargement des leçons…" />;
+  // Sens du glissement quand on change de niveau : vers la gauche si on avance (A → B), vers la droite sinon
+  const levelIndex = Math.max(0, curriculum.data.findIndex((lv) => lv.code === level));
+  const [previous, setPrevious] = useState({ index: levelIndex, direction: 0 });
+  if (previous.index !== levelIndex) {
+    setPrevious({ index: levelIndex, direction: levelIndex > previous.index ? 1 : -1 });
+  }
+
+  if (loading || curriculum.loading || !hydrated) return <LessonsSkeleton />;
   if (error || curriculum.error) return <LessonUnavailable error={error ?? curriculum.error} />;
 
   const levels = curriculum.data;
@@ -57,6 +66,13 @@ export default function LessonsPage({
 
       {active && <LevelTabs levels={tabs} active={active.code} />}
 
+      <motion.div
+        key={active?.code}
+        initial={{ opacity: 0, x: previous.direction * 32 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        className="flex flex-col gap-5 md:gap-6"
+      >
       {active && active.units.length > 0 ? (
         active.units.map((unit) => (
           <UnitSection
@@ -79,6 +95,7 @@ export default function LessonsPage({
           </p>
         </div>
       )}
+      </motion.div>
     </div>
   );
 }

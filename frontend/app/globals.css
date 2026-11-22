@@ -83,3 +83,26 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ══ Lenis (défilement fluide) ══ */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis:not(.lenis-autoToggle).lenis-stopped {
+  overflow: clip;
+}
+.lenis [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+/* ══ Bascule clair/sombre : révélation en cercle (View Transitions) ══
+   L'animation elle-même est lancée en JavaScript (components/ui/ThemeToggle.tsx). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}

@@ -4,11 +4,15 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CurriculumLevel, Lesson } from "@/types";
 import { getCurriculum, getLesson, getLessons } from "@/lib/lessons";
+import type { SharedRequest } from "@/lib/api";
 
-/** Charge une liste une fois au montage : renvoie les données, l'état de chargement et l'erreur. */
-function useList<T>(load: () => Promise<T[]>) {
-  const [data, setData] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
+/**
+ * Charge une liste partagée : renvoie les données, l'état de chargement et l'erreur.
+ * Si les données sont déjà en mémoire (page revisitée), elles s'affichent tout de suite.
+ */
+function useList<T>(load: SharedRequest<T[]>) {
+  const [data, setData] = useState<T[]>(() => load.peek() ?? []);
+  const [loading, setLoading] = useState(() => load.peek() === undefined);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

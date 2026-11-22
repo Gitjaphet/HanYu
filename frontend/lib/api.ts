@@ -48,17 +48,31 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return response.json() as Promise<T>;
 }
 
+/** Requête partagée : appel (promesse) + lecture immédiate du résultat déjà reçu. */
+export type SharedRequest<T> = (() => Promise<T>) & {
+  /** Le résultat s'il est déjà arrivé, sinon undefined (aucun appel réseau). */
+  peek: () => T | undefined;
+};
+
 /**
  * Partage une même requête entre tous les composants qui la demandent (accueil, menus…) :
  * un seul appel réseau par chargement de page. En cas d'échec, l'appel suivant réessaie.
+ * Le résultat reste en mémoire : en revenant sur une page, il s'affiche sans écran de chargement.
  */
-export function sharedRequest<T>(load: () => Promise<T>): () => Promise<T> {
+export function sharedRequest<T>(load: () => Promise<T>): SharedRequest<T> {
   let pending: Promise<T> | null = null;
-  return () => {
-    pending ??= load().catch((error) => {
-      pending = null;
-      throw error;
-    });
+  let value: T | undefined;
+  const get = () => {
+    pending ??= load()
+      .then((result) => {
+        value = result;
+        return result;
+      })
+      .catch((error) => {
+        pending = null;
+        throw error;
+      });
     return pending;
   };
+  return Object.assign(get, { peek: () => value });
 }

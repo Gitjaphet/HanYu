@@ -132,7 +132,7 @@ export function LessonRow({ lesson, number, status, progress, current }: Props) 
     <Link
       href={`/lesson/${lesson.id}`}
       aria-current={current ? "step" : undefined}
-      className={`${base} transition-colors hover:bg-background/70 ${
+      className={`${base} transition-[background-color,transform] duration-200 hover:bg-background/70 active:scale-[0.99] ${
         current ? "rounded-2xl ring-2 ring-inset ring-primary" : ""
       }`}
     >
