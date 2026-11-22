@@ -11,8 +11,10 @@ import {
 import styles from "./Sidebar.module.css";
 import { useCurriculum } from "@/hooks/useLessons";
 import { useProgressStore } from "@/store/progressStore";
+import { useUserStore } from "@/store/userStore";
 
-const mockUser = { initials: "IN", name: "Invité", xp: 15, xpGoal: 50, streak: 3 };
+// XP et série : fictifs jusqu'à la gamification côté serveur
+const mockUser = { xp: 15, xpGoal: 50, streak: 3 };
 
 function SidebarContent() {
   const pathname     = usePathname();
@@ -22,6 +24,11 @@ function SidebarContent() {
   const currentUnit  = Number(searchParams.get("unit") ?? "1");
 
   const { data: curriculum } = useCurriculum();
+  const account = useUserStore((st) => st.user);
+  const accountStatus = useUserStore((st) => st.status);
+  const logout = useUserStore((st) => st.logout);
+  const displayName = account?.pseudo ?? "Invité";
+  const initials = displayName.slice(0, 2).toUpperCase();
   const progress = useProgressStore((st) => st.progress);
   const hydrated = useProgressStore((st) => st.hydrated);
 
@@ -56,9 +63,9 @@ function SidebarContent() {
         <div className={styles.userCardBg}>汉</div>
 
         <div className="flex items-center gap-3 mb-3.5 relative z-10">
-          <div className={styles.avatar}>{mockUser.initials}</div>
+          <div className={styles.avatar}>{initials}</div>
           <div className="flex-1 min-w-0">
-            <div className="text-black font-bold text-sm leading-tight truncate">{mockUser.name}</div>
+            <div className="text-black font-bold text-sm leading-tight truncate">{displayName}</div>
             <div className="text-black/60 text-[12px] mt-0.5 truncate">
               Niv. {currentLevel} · {curriculum.find(l => l.code === currentLevel)?.label}
             </div>
@@ -78,6 +85,20 @@ function SidebarContent() {
             <div className={styles.xpFill} style={{ width: `${Math.min((mockUser.xp / mockUser.xpGoal) * 100, 100)}%` }} />
           </div>
         </div>
+
+        {accountStatus !== "loading" && (
+          <div className="relative z-10 mt-3 text-[12px] font-bold">
+            {account ? (
+              <button onClick={() => void logout()} className="text-black/60 hover:text-black underline-offset-2 hover:underline">
+                Se déconnecter
+              </button>
+            ) : (
+              <Link href="/login" className="text-primary hover:underline underline-offset-2">
+                Se connecter / Créer un compte
+              </Link>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ══ NAV ══ */}

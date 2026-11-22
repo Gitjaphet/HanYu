@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Josefin_Sans, Noto_Serif_SC } from "next/font/google";
 import "./globals.css";
+import { SessionLoader } from "@/components/providers/SessionLoader";
 
 // 1. Josefin Sans — police principale de l'interface
 const josefinSans = Josefin_Sans({ 
@@ -29,6 +30,7 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className={`${josefinSans.variable} ${notoSerifSC.variable} antialiased`}>
+        <SessionLoader />
         {children}
       </body>
     </html>

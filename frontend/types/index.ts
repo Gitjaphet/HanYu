@@ -2,13 +2,12 @@
 
 // ─── EXISTANTS (inchangés) ─────────────────────────────────────────────────
 
-export type Role = 'student' | 'teacher'
-
+/** Compte connecté (GET /auth/me). Le rôle dépend de l'école : il viendra des adhésions. */
 export interface User {
-  id: string
+  id: number
   email: string
   pseudo: string
-  role: Role
+  isSuperadmin: boolean
   createdAt: string
 }
 
