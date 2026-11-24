@@ -17,7 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <div className="lg:pl-64">
         <MobileHeader />
-        <main className="max-w-5xl mx-auto w-full px-3 pt-2 pb-28 md:px-6 lg:pt-8 lg:pb-10">
+        <main className="max-w-5xl xl:max-w-6xl mx-auto w-full px-3 pt-2 pb-28 md:px-6 lg:pt-8 lg:pb-10">
           {children}
         </main>
       </div>

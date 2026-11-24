@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* La variante dark: de Tailwind suit le bouton du site (data-theme), pas seulement le système */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* ══════════════════════════════════════════════
    Palette « Lavande » (inspiration Learnthru)
    Les noms restent ceux déjà utilisés par les composants

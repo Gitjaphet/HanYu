@@ -1,101 +1,69 @@
 "use client";
 
-import { use, useState } from "react";
-import Link from "next/link";
-import { Play } from "lucide-react";
-import { motion } from "motion/react";
+import { useMemo, useState } from "react";
 import { useCurriculum, useLessons } from "@/hooks/useLessons";
 import { useProgressStore } from "@/store/progressStore";
+import { useUserStore } from "@/store/userStore";
 import { countDone, nextLesson } from "@/lib/progress";
+import { activeDays, reviewWords, streak, totals, unitCards, unitWindow } from "@/lib/stats";
 import { LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
-import { LessonsSkeleton } from "@/components/lessons/LessonsSkeleton";
-import { LevelTabs } from "@/components/lessons/LevelTabs";
-import { UnitSection } from "@/components/lessons/UnitSection";
+import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
+import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
+import { UnitCards } from "@/components/dashboard/UnitCards";
+import { ProfileCard } from "@/components/dashboard/ProfileCard";
+import { StatTiles } from "@/components/dashboard/StatTiles";
+import { ActivityCalendar } from "@/components/dashboard/ActivityCalendar";
+import { ReviewWords } from "@/components/dashboard/ReviewWords";
 
-export default function LessonsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ level?: string }>;
-}) {
-  const { level } = use(searchParams);
+export default function DashboardPage() {
   const { lessons, loading, error } = useLessons();
   const curriculum = useCurriculum();
   const progress = useProgressStore((s) => s.progress);
   const hydrated = useProgressStore((s) => s.hydrated);
+  const pseudo = useUserStore((s) => s.user?.pseudo ?? null);
+  const [today] = useState(() => new Date());
 
-  // Sens du glissement quand on change de niveau : vers la gauche si on avance (A → B), vers la droite sinon
-  const levelIndex = Math.max(0, curriculum.data.findIndex((lv) => lv.code === level));
-  const [previous, setPrevious] = useState({ index: levelIndex, direction: 0 });
-  if (previous.index !== levelIndex) {
-    setPrevious({ index: levelIndex, direction: levelIndex > previous.index ? 1 : -1 });
-  }
+  const days = useMemo(() => activeDays(progress), [progress]);
 
-  if (loading || curriculum.loading || !hydrated) return <LessonsSkeleton />;
+  if (loading || curriculum.loading || !hydrated) return <DashboardSkeleton />;
   if (error || curriculum.error) return <LessonUnavailable error={error ?? curriculum.error} />;
 
-  const levels = curriculum.data;
-  const active = levels.find((lv) => lv.code === level) ?? levels[0];
   const next = nextLesson(lessons, progress);
+  const { xp, stars, done } = totals(progress);
+  const levelCode = next?.levelId ?? curriculum.data.at(-1)?.code ?? "A";
+  const levelLessons = lessons.filter((l) => l.levelId === levelCode);
+  const remaining = levelLessons.length - countDone(levelLessons, progress);
 
-  const tabs = levels.map((lv) => {
-    const levelLessons = lessons.filter((l) => l.levelId === lv.code);
-    return { code: lv.code, label: lv.label, done: countDone(levelLessons, progress), total: levelLessons.length };
-  });
+  let message: string;
+  if (!next) {
+    message = "Bravo, tu as terminé toutes les leçons disponibles !";
+  } else if (done === 0) {
+    message = "Bienvenue ! Commence ta première leçon de mandarin, elle ne prend que quelques minutes.";
+  } else {
+    const position = levelLessons.findIndex((l) => l.id === next.id) + 1;
+    message = `Tu en es à la leçon ${position} de l'unité « ${next.unitTitle} ». Encore ${remaining} leçon${remaining > 1 ? "s" : ""} pour terminer le niveau ${levelCode}.`;
+  }
+
+  const dateLabel = today.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <div className="flex flex-col gap-5 md:gap-6">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl md:text-3xl font-extrabold text-text">Leçons</h1>
-          {active && (
-            <p className="text-sm md:text-[15px] text-text-muted">
-              Niveau {active.code} · {active.label} — {active.subtitle}
-            </p>
-          )}
-        </div>
-        {next && (
-          <Link
-            href={`/lesson/${next.id}`}
-            className="hidden md:inline-flex items-center gap-2 self-start md:self-auto rounded-full bg-primary hover:bg-primary-dark px-6 py-3 text-sm font-extrabold text-white shadow-[var(--shadow-primary)]"
-          >
-            <Play size={14} className="fill-current" aria-hidden="true" />
-            Reprendre : {next.title}
-          </Link>
-        )}
-      </header>
+    <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
+      {/* ── Colonne principale ── */}
+      <div className="flex flex-col gap-6 min-w-0">
+        <p className="text-sm font-bold text-text-muted first-letter:uppercase">{dateLabel}</p>
+        <WelcomeBanner pseudo={pseudo} next={next} message={message} />
+        <UnitCards units={unitWindow(unitCards(curriculum.data, lessons, progress))} />
+      </div>
 
-      {active && <LevelTabs levels={tabs} active={active.code} />}
-
-      <motion.div
-        key={active?.code}
-        initial={{ opacity: 0, x: previous.direction * 32 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        className="flex flex-col gap-5 md:gap-6"
-      >
-      {active && active.units.length > 0 ? (
-        active.units.map((unit) => (
-          <UnitSection
-            key={unit.number}
-            number={unit.number}
-            title={unit.title}
-            unitLessons={unit.lessonIds
-              .map((id) => lessons.find((l) => l.id === id))
-              .filter((l) => l !== undefined)}
-            allLessons={lessons}
-            progress={progress}
-            currentId={next?.id ?? null}
-          />
-        ))
-      ) : (
-        <div className="rounded-3xl bg-card px-6 py-12 text-center">
-          <p className="text-lg font-extrabold text-text">Bientôt disponible</p>
-          <p className="mt-1 text-sm text-text-muted">
-            Les leçons du niveau {active?.code} arrivent bientôt.
-          </p>
+      {/* ── Panneau : à droite sur grand écran, en dessous sinon ── */}
+      <aside aria-label="Mon espace" className="mt-6 xl:mt-0 grid md:grid-cols-2 xl:grid-cols-1 gap-4 xl:sticky xl:top-8">
+        <ProfileCard pseudo={pseudo} levelLabel={`Élève · Niveau ${levelCode}`} />
+        <div className="flex flex-col gap-4">
+          <StatTiles streak={streak(days, today)} xp={xp} stars={stars} />
+          <ReviewWords words={reviewWords(lessons, progress)} />
         </div>
-      )}
-      </motion.div>
+        <ActivityCalendar days={days} today={today} />
+      </aside>
     </div>
   );
 }

@@ -17,7 +17,7 @@ export function LevelTabs({ levels, active }: { levels: LevelTab[]; active: stri
         return (
           <Link
             key={lv.code}
-            href={`/?level=${lv.code}`}
+            href={`/lecons?level=${lv.code}`}
             scroll={false}
             aria-current={on ? "page" : undefined}
             className={`relative flex-1 min-w-0 flex items-center justify-center md:justify-start gap-2 md:gap-3 rounded-xl px-2 py-2 md:px-5 md:py-3 transition-colors duration-200 ${
