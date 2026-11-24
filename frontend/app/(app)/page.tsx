@@ -1,99 +1,69 @@
 "use client";
 
-import { LessonCard } from "@/components/lesson/LessonCard/LessonCard";
+import { useMemo, useState } from "react";
 import { useCurriculum, useLessons } from "@/hooks/useLessons";
 import { useProgressStore } from "@/store/progressStore";
-import { lessonStatus } from "@/lib/progress";
-import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
-import styles from "./page.module.css";
+import { useUserStore } from "@/store/userStore";
+import { countDone, nextLesson } from "@/lib/progress";
+import { activeDays, reviewWords, streak, totals, unitCards, unitWindow } from "@/lib/stats";
+import { LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
+import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
+import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
+import { UnitCards } from "@/components/dashboard/UnitCards";
+import { ProfileCard } from "@/components/dashboard/ProfileCard";
+import { StatTiles } from "@/components/dashboard/StatTiles";
+import { ActivityCalendar } from "@/components/dashboard/ActivityCalendar";
+import { ReviewWords } from "@/components/dashboard/ReviewWords";
 
-import { use } from "react";
-
-export default  function HomePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ level?: string; unit?: string }>;
-}) {
-  const sp = use(searchParams);
-  const activeLevel = sp.level || "A";
-  const activeUnit  = sp.unit ? parseInt(sp.unit, 10) : 1;
-
+export default function DashboardPage() {
   const { lessons, loading, error } = useLessons();
   const curriculum = useCurriculum();
-  const meta = curriculum.data.find((lv) => lv.code === activeLevel);
-
-  const lessonsForUnit = lessons.filter(
-    l => l.levelId === activeLevel && l.unitId === activeUnit
-  );
-  const currentUnitTitle = lessonsForUnit[0]?.unitTitle ?? "";
-
   const progress = useProgressStore((s) => s.progress);
   const hydrated = useProgressStore((s) => s.hydrated);
+  const pseudo = useUserStore((s) => s.user?.pseudo ?? null);
+  const [today] = useState(() => new Date());
 
-  if (loading || curriculum.loading || !hydrated) return <LessonLoading label="Chargement des leçons…" />;
+  const days = useMemo(() => activeDays(progress), [progress]);
+
+  if (loading || curriculum.loading || !hydrated) return <DashboardSkeleton />;
   if (error || curriculum.error) return <LessonUnavailable error={error ?? curriculum.error} />;
 
+  const next = nextLesson(lessons, progress);
+  const { xp, stars, done } = totals(progress);
+  const levelCode = next?.levelId ?? curriculum.data.at(-1)?.code ?? "A";
+  const levelLessons = lessons.filter((l) => l.levelId === levelCode);
+  const remaining = levelLessons.length - countDone(levelLessons, progress);
+
+  let message: string;
+  if (!next) {
+    message = "Bravo, tu as terminé toutes les leçons disponibles !";
+  } else if (done === 0) {
+    message = "Bienvenue ! Commence ta première leçon de mandarin, elle ne prend que quelques minutes.";
+  } else {
+    const position = levelLessons.findIndex((l) => l.id === next.id) + 1;
+    message = `Tu en es à la leçon ${position} de l'unité « ${next.unitTitle} ». Encore ${remaining} leçon${remaining > 1 ? "s" : ""} pour terminer le niveau ${levelCode}.`;
+  }
+
+  const dateLabel = today.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
   return (
-    <div className={styles.page}>
+    <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
+      {/* ── Colonne principale ── */}
+      <div className="flex flex-col gap-6 min-w-0">
+        <p className="text-sm font-bold text-text-muted first-letter:uppercase">{dateLabel}</p>
+        <WelcomeBanner pseudo={pseudo} next={next} message={message} />
+        <UnitCards units={unitWindow(unitCards(curriculum.data, lessons, progress))} />
+      </div>
 
-      {/* ══ HERO — carte flottante premium ══ */}
-      <header className={styles.hero}>
-        <div className={styles.heroContent}>
-          <div className={styles.heroLeft}>
-            <span className={styles.heroTag}>{meta?.tag}</span>
-            <h1 className={styles.heroTitle}>
-              <span className={styles.heroTitleOutline}>Niveau</span>
-              <span className={styles.heroTitleSolid}>{activeLevel}</span>
-            </h1>
-            <p className={styles.heroSub}>{meta?.subtitle}</p>
-          </div>
-
-          <div className={styles.heroRight}>
-            <div className={styles.xpBox}>
-              <span className={styles.xpLabel}>Objectif du jour</span>
-              <span className={styles.xpValue}>
-                0 <span className={styles.xpOf}>/ 50 XP</span>
-              </span>
-              <div className={styles.xpBar}>
-                <div className={styles.xpFill} style={{ width: "0%" }} />
-              </div>
-            </div>
-          </div>
+      {/* ── Panneau : à droite sur grand écran, en dessous sinon ── */}
+      <aside aria-label="Mon espace" className="mt-6 xl:mt-0 grid md:grid-cols-2 xl:grid-cols-1 gap-4 xl:sticky xl:top-8">
+        <ProfileCard pseudo={pseudo} levelLabel={`Élève · Niveau ${levelCode}`} />
+        <div className="flex flex-col gap-4">
+          <StatTiles streak={streak(days, today)} xp={xp} stars={stars} />
+          <ReviewWords words={reviewWords(lessons, progress)} />
         </div>
-      </header>
-
-      {/* ══ SECTION UNITÉ ══ */}
-      <section className={styles.unitSection}>
-        {lessonsForUnit.length > 0 ? (
-          <>
-            <div className={styles.unitHeader}>
-              <div className={styles.unitBadge}>{activeUnit}</div>
-              <div>
-                <h2 className={styles.unitTitle}>Unité N°{activeUnit}</h2>
-                <p className={styles.unitSub}>{currentUnitTitle}</p>
-              </div>
-            </div>
-
-            <div className={styles.grid}>
-                {lessonsForUnit.map((lesson) => (
-                <LessonCard
-                  key={lesson.id}
-                  lesson={lesson}
-                  status={lessonStatus(lessons, progress, lesson.id)}
-                  starsEarned={progress[lesson.id]?.stars ?? 0}
-                />
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className={styles.empty}>
-            <p className={styles.emptyTitle}>Bientôt disponible</p>
-            <p className={styles.emptySub}>
-              Les leçons pour l'Unité N°{activeUnit} — Niveau {activeLevel} arrivent bientôt.
-            </p>
-          </div>
-        )}
-      </section>
+        <ActivityCalendar days={days} today={today} />
+      </aside>
     </div>
   );
 }

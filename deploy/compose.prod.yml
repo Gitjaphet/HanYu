@@ -29,6 +29,7 @@ services:
       DATABASE_URL: postgresql+psycopg://hanyu:${POSTGRES_PASSWORD}@db:5432/hanyu
       ENVIRONMENT: production
       CORS_ORIGINS: '["https://${DOMAIN:?DOMAIN manquant dans .env}"]'
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET manquant dans .env}
       UVICORN_ROOT_PATH: /api
     networks:
       - internal

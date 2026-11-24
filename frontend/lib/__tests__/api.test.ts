@@ -20,4 +20,12 @@ describe("sharedRequest", () => {
     await expect(get()).resolves.toEqual(["A"]);
     expect(load).toHaveBeenCalledTimes(2);
   });
+
+  it("garde le résultat en mémoire pour un affichage immédiat", async () => {
+    const get = sharedRequest(vi.fn().mockResolvedValue(["A"]));
+
+    expect(get.peek()).toBeUndefined();
+    await get();
+    expect(get.peek()).toEqual(["A"]);
+  });
 });
