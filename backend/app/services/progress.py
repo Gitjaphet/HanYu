@@ -68,3 +68,55 @@ def apply_quiz(progress: LessonProgress, correct: int, total: int, wrong: int) -
     progress.xp = max(progress.xp, correct * XP_PER_CORRECT)
     if progress.completed_at is None:  # la première réussite compte pour la série
         progress.completed_at = datetime.now(UTC)
+
+
+def import_progress(session: Session, user_id: int, items: list[dict]) -> None:
+    """Fusionne la progression d'un invité (venue du navigateur) avec celle du compte.
+
+    Ces données n'ont pas été vues par le serveur : elles sont vérifiées avant d'être gardées.
+    - parcours dans l'ordre du cursus : une leçon n'est prise que si la précédente est terminée ;
+    - XP plafonné au maximum possible, date future ramenée à maintenant ;
+    - fusion « le meilleur des deux » avec ce qui est déjà enregistré.
+    """
+    now = datetime.now(UTC)
+    by_lesson = {item["lesson_id"]: item for item in items}
+    lessons = {
+        lesson.id: lesson
+        for lesson in session.exec(select(Lesson).where(Lesson.id.in_(by_lesson.keys()))).all()
+    }
+    existing = {
+        p.lesson_id: p
+        for p in session.exec(select(LessonProgress).where(LessonProgress.user_id == user_id)).all()
+    }
+
+    previous_done = True  # la première leçon du cursus est toujours ouverte
+    for lesson_id in curriculum_order(session):
+        current = existing.get(lesson_id)
+        item = by_lesson.get(lesson_id)
+        if item is not None and previous_done and lesson_id in lessons:
+            current = current or LessonProgress(user_id=user_id, lesson_id=lesson_id)
+            _merge(current, item, max_xp=len(lessons[lesson_id].quiz) * XP_PER_CORRECT, now=now)
+            session.add(current)
+            existing[lesson_id] = current
+        previous_done = current is not None and current.quiz_done
+
+
+def _merge(progress: LessonProgress, item: dict, max_xp: int, now: datetime) -> None:
+    quiz_done = item["quiz_done"] and item["stars"] > 0  # un quiz réussi a au moins 1 étoile
+    progress.vocab_done |= item["vocab_done"] or quiz_done
+    progress.dialogue_done |= item["dialogue_done"] or quiz_done
+    if not quiz_done:
+        return
+    progress.quiz_done = True
+    progress.stars = max(progress.stars, item["stars"])
+    progress.xp = max(progress.xp, min(item["xp"], max_xp))
+    completed = min(item["completed_at"] or now, now)
+    if completed.tzinfo is None:  # date sans fuseau : considérée comme UTC
+        completed = completed.replace(tzinfo=UTC)
+    if progress.completed_at is None or completed < _aware(progress.completed_at):
+        progress.completed_at = completed
+
+
+def _aware(value: datetime) -> datetime:
+    """SQLite rend les dates sans fuseau : on les considère en UTC pour pouvoir comparer."""
+    return value if value.tzinfo else value.replace(tzinfo=UTC)

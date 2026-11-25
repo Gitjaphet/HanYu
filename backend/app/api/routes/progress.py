@@ -9,8 +9,8 @@ from sqlmodel import select
 from app.api.deps import CurrentUser
 from app.core.db import SessionDep
 from app.models import Lesson, LessonProgress
-from app.schemas.progress import ProgressOut, QuizResultIn, progress_out
-from app.services.progress import HEARTS, apply_quiz, is_unlocked, missing_steps
+from app.schemas.progress import ProgressImportIn, ProgressOut, QuizResultIn, progress_out
+from app.services.progress import HEARTS, apply_quiz, import_progress, is_unlocked, missing_steps
 
 router = APIRouter(prefix="/progress", tags=["progress"])
 
@@ -23,6 +23,14 @@ def my_progress(user: CurrentUser, session: SessionDep) -> list[ProgressOut]:
         select(LessonProgress).where(LessonProgress.user_id == user.id).order_by(LessonProgress.lesson_id)
     ).all()
     return [progress_out(p) for p in rows]
+
+
+@router.post("/import", response_model=list[ProgressOut])
+def import_guest_progress(data: ProgressImportIn, user: CurrentUser, session: SessionDep) -> list[ProgressOut]:
+    """Après connexion : fusionne la progression faite en invité avec celle du compte."""
+    import_progress(session, user.id, [item.model_dump() for item in data.items])
+    session.commit()
+    return my_progress(user, session)
 
 
 def _open_lesson(session: SessionDep, user_id: int, lesson_id: int, step: str) -> tuple[Lesson, LessonProgress]:

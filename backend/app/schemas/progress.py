@@ -26,6 +26,22 @@ class QuizResultIn(ApiModel):
     wrong: int = Field(ge=0, le=HEARTS)
 
 
+class ProgressIn(ApiModel):
+    """Progression d'une leçon telle que le navigateur l'a gardée pour un invité."""
+
+    lesson_id: int
+    vocab_done: bool = False
+    dialogue_done: bool = False
+    quiz_done: bool = False
+    stars: int = Field(default=0, ge=0, le=3)
+    xp: int = Field(default=0, ge=0)
+    completed_at: datetime | None = None
+
+
+class ProgressImportIn(ApiModel):
+    items: list[ProgressIn] = Field(max_length=1000)
+
+
 def progress_out(p: LessonProgress) -> ProgressOut:
     return ProgressOut(
         lesson_id=p.lesson_id,
