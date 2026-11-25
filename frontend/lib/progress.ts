@@ -9,6 +9,10 @@ export function emptyProgress(lessonId: number): LessonProgress {
   return { lessonId, vocabDone: false, dialogueDone: false, quizDone: false, stars: 0, xp: 0 };
 }
 
+/** Règles du quiz, identiques au serveur (backend/app/services/progress.py). */
+export const XP_PER_CORRECT = 10;
+export const HEARTS = 3; // erreurs permises avant l'échec
+
 /** Étoiles du quiz : 3 = sans faute, 2 = au moins 70 %, 1 = réussi, 0 = échoué. */
 export function quizStars(score: number, total: number, failed: boolean): number {
   if (failed || total === 0) return 0;
@@ -97,4 +101,19 @@ export function nextLesson(lessons: Lesson[], progress: ProgressMap): Lesson | n
       return status === "in-progress" || status === "available";
     }) ?? null
   );
+}
+
+/** Étoiles et XP d'un quiz à partir des réponses comptées (même calcul que le serveur). */
+export function quizResult(correct: number, wrong: number, total: number): { stars: number; xp: number } {
+  return { stars: quizStars(correct, total, wrong >= HEARTS), xp: correct * XP_PER_CORRECT };
+}
+
+/**
+ * Progression locale à envoyer au serveur quand un compte se connecte :
+ * celle d'un invité (ownerId null) ou du même compte (rattrapage hors ligne),
+ * jamais celle d'un autre compte (ordinateur partagé).
+ */
+export function progressToImport(progress: ProgressMap, ownerId: number | null, userId: number): LessonProgress[] {
+  if (ownerId !== null && ownerId !== userId) return [];
+  return Object.values(progress).filter((p) => p.vocabDone || p.dialogueDone || p.quizDone);
 }

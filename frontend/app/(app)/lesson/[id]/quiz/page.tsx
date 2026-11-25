@@ -5,14 +5,13 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
 import { useLesson } from "@/hooks/useLessons";
 import { useProgressStore } from "@/store/progressStore";
-import { quizStars } from "@/lib/progress";
+import { HEARTS, XP_PER_CORRECT, quizStars } from "@/lib/progress";
 import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
 import { QuizQuestion } from "@/types";
 import { X, CheckCircle2, AlertCircle, ChevronRight, Trophy, ChevronLeft } from "lucide-react";
 import PandaMascot, { PandaState } from "@/components/lesson/PandaMascot/PandaMascot";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
-const XP_PER_CORRECT = 10;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function shuffleArray<T>(arr: T[]): T[] {
@@ -56,7 +55,7 @@ export default function QuizPage() {
   const [answerState, setAnswer]    = useState<AnswerState>("idle");
   const [score, setScore]           = useState(0);
   const [xp, setXp]                 = useState(0);
-  const [hearts, setHearts]         = useState(3);
+  const [hearts, setHearts]         = useState(HEARTS);
   const [isFinished, setIsFinished] = useState(false);
 
   // ── Panda ──
@@ -104,8 +103,9 @@ export default function QuizPage() {
   // ─── Sauvegarde ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isFinished || !lesson) return;
-    completeQuiz(lesson.id, { stars: quizStars(score, questions.length, hearts <= 0), xp });
-  }, [isFinished, lesson, score, questions.length, hearts, xp, completeQuiz]);
+    // Le serveur recalcule étoiles et XP à partir des réponses : on envoie des faits
+    completeQuiz(lesson.id, { correct: score, wrong: HEARTS - hearts, total: questions.length });
+  }, [isFinished, lesson, score, questions.length, hearts, completeQuiz]);
 
   // ─── Garde ────────────────────────────────────────────────────────────────
   if (loading) return <LessonLoading />;
@@ -206,7 +206,7 @@ export default function QuizPage() {
                 setAnswer("idle");
                 setScore(0);
                 setXp(0);
-                setHearts(3);
+                setHearts(HEARTS);
                 setIsFinished(false);
                 setPandaState("idle");
               }}
