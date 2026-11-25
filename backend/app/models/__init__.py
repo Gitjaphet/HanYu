@@ -20,8 +20,10 @@ from app.models.lesson import (  # noqa: E402  (après la convention, exprès)
     Unit,
     VocabItem,
 )
+from app.models.progress import LessonProgress  # noqa: E402
 from app.models.user import User  # noqa: E402
 
 __all__ = [
-    "QUIZ_TYPES", "DialogueLine", "Lesson", "Level", "QuizQuestion", "Unit", "User", "VocabItem",
+    "QUIZ_TYPES", "DialogueLine", "Lesson", "LessonProgress", "Level", "QuizQuestion", "Unit", "User",
+    "VocabItem",
 ]

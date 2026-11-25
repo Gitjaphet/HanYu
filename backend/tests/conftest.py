@@ -2,6 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -18,6 +19,13 @@ def session() -> Iterator[Session]:
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    # SQLite n'applique les clés étrangères (et donc ON DELETE CASCADE) que si on le demande :
+    # on l'active pour que les tests se comportent comme PostgreSQL.
+    @event.listens_for(engine, "connect")
+    def _foreign_keys_on(dbapi_connection, _record):
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         yield session
