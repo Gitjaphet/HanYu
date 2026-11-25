@@ -15,9 +15,10 @@ def get_current_user(
     session: SessionDep,
     token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
 ) -> User:
-    user_id = read_session_token(token) if token else None
-    user = session.get(User, user_id) if user_id else None
-    if user is None or not user.is_active:
+    claims = read_session_token(token) if token else None
+    user = session.get(User, claims.user_id) if claims else None
+    # Version différente : la session a été révoquée (« déconnecter les autres appareils »)
+    if user is None or not user.is_active or user.session_version != claims.version:
         raise NOT_AUTHENTICATED
     return user
 

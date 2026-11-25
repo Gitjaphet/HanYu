@@ -21,6 +21,8 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=True)
     # Équipe HanYu (toi) : gère les écoles et le contenu de la plateforme. Jamais par inscription.
     is_superadmin: bool = Field(default=False)
+    # Augmenté pour révoquer d'un coup toutes les sessions ouvertes (jetons déjà émis)
+    session_version: int = Field(default=0, sa_column_kwargs={"server_default": "0"})
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),

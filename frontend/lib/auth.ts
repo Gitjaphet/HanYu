@@ -32,3 +32,8 @@ export async function getMe(): Promise<User | null> {
 export function safeNextPath(next: string | null): string {
   return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 }
+
+/** Déconnecte tous les autres appareils ; celui-ci reçoit un nouveau cookie et reste connecté. */
+export function logoutOthers(): Promise<void> {
+  return apiFetch<void>("/auth/logout-others", { method: "POST" });
+}
