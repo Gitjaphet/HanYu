@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LogIn, LogOut } from "lucide-react";
 import { motion } from "motion/react";
 import { useUserStore } from "@/store/userStore";
@@ -14,6 +14,7 @@ export function Sidebar() {
   const account = useUserStore((st) => st.user);
   const accountStatus = useUserStore((st) => st.status);
   const logout = useUserStore((st) => st.logout);
+  const router = useRouter();
 
   return (
     <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 z-40 bg-card border-r border-border px-4 py-6">
@@ -62,7 +63,7 @@ export function Sidebar() {
               <span className="flex-1 min-w-0 text-sm font-extrabold text-text truncate">{account.pseudo}</span>
               <button
                 type="button"
-                onClick={() => void logout()}
+                onClick={() => void logout().then(() => router.replace("/login"))}
                 aria-label="Se déconnecter"
                 title="Se déconnecter"
                 className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:bg-card hover:text-text"

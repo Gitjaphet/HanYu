@@ -82,3 +82,12 @@ def test_lecon_inconnue_ignoree(student: TestClient):
 
 def test_etoiles_impossibles_refusees(student: TestClient):
     assert student.post("/progress/import", json={"items": [done(1, stars=5)]}).status_code == 422
+
+
+def test_date_sans_fuseau_acceptee(student: TestClient):
+    # Une date sans « Z » ni décalage ne doit pas faire planter l'import (considérée en UTC)
+    rows = by_lesson(student.post("/progress/import", json={"items": [
+        done(1, completed_at="2026-11-20T10:00:00"),
+    ]}))
+
+    assert rows[1]["completedAt"].startswith("2026-11-20T10:00")

@@ -110,13 +110,12 @@ def _merge(progress: LessonProgress, item: dict, max_xp: int, now: datetime) -> 
     progress.quiz_done = True
     progress.stars = max(progress.stars, item["stars"])
     progress.xp = max(progress.xp, min(item["xp"], max_xp))
-    completed = min(item["completed_at"] or now, now)
-    if completed.tzinfo is None:  # date sans fuseau : considérée comme UTC
-        completed = completed.replace(tzinfo=UTC)
+    # Fuseau d'abord (une date sans fuseau est considérée en UTC), puis plafond à maintenant
+    completed = min(_aware(item["completed_at"] or now), now)
     if progress.completed_at is None or completed < _aware(progress.completed_at):
         progress.completed_at = completed
 
 
 def _aware(value: datetime) -> datetime:
-    """SQLite rend les dates sans fuseau : on les considère en UTC pour pouvoir comparer."""
+    """Date sans fuseau (SQLite, ancien navigateur…) : considérée en UTC pour pouvoir comparer."""
     return value if value.tzinfo else value.replace(tzinfo=UTC)
