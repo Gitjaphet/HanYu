@@ -22,7 +22,7 @@ def _open_session(response: Response, user: User) -> None:
     """Dépose le jeton dans un cookie que le JavaScript de la page ne peut pas lire."""
     response.set_cookie(
         SESSION_COOKIE,
-        create_session_token(user.id),
+        create_session_token(user.id, user.session_version),
         max_age=settings.session_days * 24 * 3600,
         httponly=True,                     # invisible pour JavaScript → protégé du vol par XSS
         secure=settings.is_production,     # HTTPS uniquement en production
@@ -74,6 +74,16 @@ def login(data: LoginIn, response: Response, session: SessionDep) -> UserOut:
 def logout(response: Response) -> None:
     response.delete_cookie(SESSION_COOKIE, path="/", secure=settings.is_production,
                            httponly=True, samesite="lax")
+
+
+@router.post("/logout-others", status_code=status.HTTP_204_NO_CONTENT)
+def logout_others(user: CurrentUser, response: Response, session: SessionDep) -> None:
+    """Déconnecte tous les autres appareils : les anciens jetons deviennent invalides,
+    celui-ci reçoit un nouveau jeton et reste connecté."""
+    user.session_version += 1
+    session.add(user)
+    session.commit()
+    _open_session(response, user)
 
 
 @router.get("/me", response_model=UserOut)

@@ -1,6 +1,7 @@
 """Sécurité : mots de passe (Argon2) et jetons de session (JWT signé)."""
 
 from datetime import UTC, datetime, timedelta
+from typing import NamedTuple
 
 import jwt
 from pwdlib import PasswordHash
@@ -29,16 +30,27 @@ def verify_password(password: str, password_hash: str | None) -> bool:
     return _hasher.verify(password, password_hash)
 
 
-def create_session_token(user_id: int) -> str:
+class SessionClaims(NamedTuple):
+    user_id: int
+    version: int  # numéro de version des sessions du compte au moment de la connexion
+
+
+def create_session_token(user_id: int, version: int) -> str:
     now = datetime.now(UTC)
-    payload = {"sub": str(user_id), "iat": now, "exp": now + timedelta(days=settings.session_days)}
+    payload = {
+        "sub": str(user_id),
+        "ver": version,
+        "iat": now,
+        "exp": now + timedelta(days=settings.session_days),
+    }
     return jwt.encode(payload, settings.jwt_secret, algorithm=JWT_ALGORITHM)
 
 
-def read_session_token(token: str) -> int | None:
-    """Identifiant du compte si le jeton est authentique et non expiré, sinon None."""
+def read_session_token(token: str) -> SessionClaims | None:
+    """Compte et version si le jeton est authentique et non expiré, sinon None."""
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[JWT_ALGORITHM])
-        return int(payload["sub"])
-    except (jwt.InvalidTokenError, KeyError, ValueError):
+        # Jetons émis avant l'ajout des versions : considérés comme version 0
+        return SessionClaims(int(payload["sub"]), int(payload.get("ver", 0)))
+    except (jwt.InvalidTokenError, KeyError, ValueError, TypeError):
         return None

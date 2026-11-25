@@ -5,6 +5,7 @@ import {
   CreditCard, ChevronRight, Volume2, Shield 
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { SecuritySettings } from "@/components/settings/SecuritySettings";
 
 export default function SettingsPage() {
   return (
@@ -46,6 +47,8 @@ export default function SettingsPage() {
           <ThemeToggle withLabel />
         </div>
       </div>
+
+      <SecuritySettings />
 
       {/* ── Aperçu des paramètres (Flouté/Grisé) ── */}
       <div className="opacity-50 select-none pointer-events-none grayscale-[40%] transition-all flex flex-col gap-6">
