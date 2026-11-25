@@ -41,8 +41,20 @@ services:
       - traefik.http.routers.hanyu-api.entrypoints=websecure
       - traefik.http.routers.hanyu-api.tls.certresolver=letsencrypt
       - traefik.http.routers.hanyu-api.middlewares=hanyu-api-strip
+      - traefik.http.routers.hanyu-api.service=hanyu-api
       - traefik.http.middlewares.hanyu-api-strip.stripprefix.prefixes=/api
       - traefik.http.services.hanyu-api.loadbalancer.server.port=8000
+      # Connexion et inscription : limite par adresse IP, appliquée par Traefik avant l'API.
+      # Large (60/min) car une école connecte toute une classe depuis la même IP ;
+      # la vraie protection contre la force brute est le blocage par e-mail dans l'API.
+      - traefik.http.routers.hanyu-auth.rule=Host(`${DOMAIN}`) && (Path(`/api/auth/login`) || Path(`/api/auth/register`))
+      - traefik.http.routers.hanyu-auth.entrypoints=websecure
+      - traefik.http.routers.hanyu-auth.tls.certresolver=letsencrypt
+      - traefik.http.routers.hanyu-auth.middlewares=hanyu-auth-limit,hanyu-api-strip
+      - traefik.http.routers.hanyu-auth.service=hanyu-api
+      - traefik.http.middlewares.hanyu-auth-limit.ratelimit.average=60
+      - traefik.http.middlewares.hanyu-auth-limit.ratelimit.period=1m
+      - traefik.http.middlewares.hanyu-auth-limit.ratelimit.burst=60
 
   web:
     image: ghcr.io/gitjaphet/hanyu-web:${IMAGE_TAG:-latest}
