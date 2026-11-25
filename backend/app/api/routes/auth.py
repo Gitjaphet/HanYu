@@ -13,6 +13,7 @@ from app.core.security import (
 )
 from app.models import User
 from app.schemas.auth import LoginIn, RegisterIn, UserOut, user_out
+from app.services.login_throttle import clear_failures, record_failure, retry_after
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -48,11 +49,23 @@ def register(data: RegisterIn, response: Response, session: SessionDep) -> UserO
 
 @router.post("/login", response_model=UserOut)
 def login(data: LoginIn, response: Response, session: SessionDep) -> UserOut:
+    # Trop d'échecs récents pour cet e-mail (qu'il existe ou non) : on refuse sans vérifier
+    wait = retry_after(session, data.email)
+    if wait:
+        minutes = -(-wait // 60)  # arrondi au supérieur
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Trop de tentatives. Réessaie dans {minutes} minute{'s' if minutes > 1 else ''}.",
+            headers={"Retry-After": str(wait)},
+        )
+
     user = session.exec(select(User).where(User.email == data.email)).first()
     # Même message et même durée, que l'e-mail existe ou non
     if not verify_password(data.password, user.password_hash if user else None) or not user.is_active:
+        record_failure(session, data.email)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="E-mail ou mot de passe incorrect")
 
+    clear_failures(session, data.email)
     _open_session(response, user)
     return user_out(user)
 
