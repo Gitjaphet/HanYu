@@ -1,5 +1,6 @@
 // app/(auth)/layout.tsx — pages connexion / inscription : panneau de marque (desktop) + formulaire
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -27,7 +28,26 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <span className="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center text-lg font-bold">语</span>
           <span className="text-lg font-extrabold tracking-tight text-text">HanYu</span>
         </Link>
-        <div className="w-full max-w-md mx-auto">{children}</div>
+        <div className="w-full max-w-md mx-auto">
+          {children}
+
+          {/* Mode invité : rien n'est enregistré sur le serveur, tout reste dans ce navigateur */}
+          <div className="mt-8 flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-text-muted">
+            <span className="h-px flex-1 bg-border" />
+            ou
+            <span className="h-px flex-1 bg-border" />
+          </div>
+          <Link
+            href="/lecons"
+            className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-card py-3.5 font-bold text-primary ring-1 ring-inset ring-border transition hover:bg-tint active:scale-[0.98]"
+          >
+            Essayer sans compte
+            <ArrowRight size={18} aria-hidden="true" />
+          </Link>
+          <p className="mt-3 text-center text-xs text-text-muted">
+            Ta progression restera sur cet appareil. Crée un compte quand tu veux : elle te suivra.
+          </p>
+        </div>
       </main>
     </div>
   );
