@@ -29,19 +29,32 @@ export default function DashboardPage() {
   if (error || curriculum.error) return <LessonUnavailable error={error ?? curriculum.error} />;
 
   const next = nextLesson(lessons, progress);
-  const { xp, stars, done } = totals(progress);
+  const { xp, stars } = totals(progress);
   const levelCode = next?.levelId ?? curriculum.data.at(-1)?.code ?? "A";
   const levelLessons = lessons.filter((l) => l.levelId === levelCode);
   const remaining = levelLessons.length - countDone(levelLessons, progress);
 
+  // L'élève a-t-il déjà commencé quelque chose ? La leçon proposée est-elle entamée ?
+  const started = Object.values(progress).some((p) => p.vocabDone || p.dialogueDone || p.quizDone);
+  const current = next ? progress[next.id] : undefined;
+  const stepsLeft = current
+    ? [!current.vocabDone && "le vocabulaire", !current.dialogueDone && "le dialogue", !current.quizDone && "le quiz"].filter(Boolean)
+    : [];
+  const inProgress = stepsLeft.length > 0 && stepsLeft.length < 3;
+
   let message: string;
+  let ctaLabel = "Leçon suivante";
   if (!next) {
     message = "Bravo, tu as terminé toutes les leçons disponibles !";
-  } else if (done === 0) {
+  } else if (!started) {
     message = "Bienvenue ! Commence ta première leçon de mandarin, elle ne prend que quelques minutes.";
+    ctaLabel = "Commencer";
+  } else if (inProgress) {
+    message = `Tu es en pleine leçon « ${next.title} » : il te reste ${stepsLeft.join(" et ")}.`;
+    ctaLabel = "Continuer";
   } else {
     const position = levelLessons.findIndex((l) => l.id === next.id) + 1;
-    message = `Tu en es à la leçon ${position} de l'unité « ${next.unitTitle} ». Encore ${remaining} leçon${remaining > 1 ? "s" : ""} pour terminer le niveau ${levelCode}.`;
+    message = `Prochaine étape : la leçon ${position} de l'unité « ${next.unitTitle} ». Encore ${remaining} leçon${remaining > 1 ? "s" : ""} pour terminer le niveau ${levelCode}.`;
   }
 
   const dateLabel = today.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -51,7 +64,7 @@ export default function DashboardPage() {
       {/* ── Colonne principale ── */}
       <div className="flex flex-col gap-6 min-w-0">
         <p className="text-sm font-bold text-text-muted first-letter:uppercase">{dateLabel}</p>
-        <WelcomeBanner pseudo={pseudo} next={next} message={message} />
+        <WelcomeBanner pseudo={pseudo} next={next} message={message} ctaLabel={ctaLabel} />
         <UnitCards units={unitWindow(unitCards(curriculum.data, lessons, progress))} />
       </div>
 
