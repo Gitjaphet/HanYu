@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Mulish, Noto_Serif_SC } from "next/font/google";
 import "./globals.css";
 import { SessionLoader } from "@/components/providers/SessionLoader";
 import { themeScript } from "@/lib/theme";
 import { SmoothScroll } from "@/components/providers/SmoothScroll";
+import { NavigationIndicator } from "@/components/layout/NavigationIndicator";
 
 // 1. Mulish — police principale de l'interface
 const mulish = Mulish({
@@ -37,6 +39,9 @@ export default function RootLayout({
       <body className={`${mulish.variable} ${notoSerifSC.variable} antialiased`}>
         <SessionLoader />
         <SmoothScroll>{children}</SmoothScroll>
+        <Suspense fallback={null}>
+          <NavigationIndicator />
+        </Suspense>
       </body>
     </html>
   );
