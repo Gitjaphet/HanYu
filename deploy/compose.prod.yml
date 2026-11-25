@@ -30,6 +30,8 @@ services:
       ENVIRONMENT: production
       CORS_ORIGINS: '["https://${DOMAIN:?DOMAIN manquant dans .env}"]'
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET manquant dans .env}
+      BREVO_API_KEY: ${BREVO_API_KEY:?BREVO_API_KEY manquant dans .env}
+      FRONTEND_URL: https://${DOMAIN}
       UVICORN_ROOT_PATH: /api
     networks:
       - internal
