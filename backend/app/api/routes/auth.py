@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, status
 from sqlalchemy import func
 from sqlmodel import select
 
@@ -12,8 +12,22 @@ from app.core.security import (
     verify_password,
 )
 from app.models import User
-from app.schemas.auth import LoginIn, RegisterIn, UserOut, user_out
+from app.schemas.auth import (
+    ForgotPasswordIn,
+    LoginIn,
+    MessageOut,
+    RegisterIn,
+    ResetPasswordIn,
+    UserOut,
+    user_out,
+)
+from app.services.email import EmailSenderDep
 from app.services.login_throttle import clear_failures, record_failure, retry_after
+from app.services.password_reset import issue_token, reset_password
+from app.services.reset_mail import build_reset_email, reset_link, send_reset_email
+
+# Même réponse que le compte existe ou non : on ne révèle pas qui est inscrit
+FORGOT_MESSAGE = "Si un compte existe avec cet e-mail, un lien pour changer le mot de passe vient d'y être envoyé."
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -84,6 +98,29 @@ def logout_others(user: CurrentUser, response: Response, session: SessionDep) ->
     session.add(user)
     session.commit()
     _open_session(response, user)
+
+
+@router.post("/forgot-password", response_model=MessageOut, status_code=status.HTTP_202_ACCEPTED)
+def forgot_password(
+    data: ForgotPasswordIn, background: BackgroundTasks, session: SessionDep, sender: EmailSenderDep
+) -> MessageOut:
+    user = session.exec(select(User).where(User.email == data.email)).first()
+    if user and user.is_active:
+        token = issue_token(session, user)  # None au-delà de 3 liens par heure : rien de plus n'est envoyé
+        if token:
+            # Envoi après la réponse : la durée de réponse ne trahit pas l'existence du compte
+            background.add_task(send_reset_email, sender, build_reset_email(user.email, user.pseudo, reset_link(token)))
+    return MessageOut(detail=FORGOT_MESSAGE)
+
+
+@router.post("/reset-password", response_model=UserOut)
+def reset_password_route(data: ResetPasswordIn, response: Response, session: SessionDep) -> UserOut:
+    user = reset_password(session, data.token, data.password)
+    if user is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Ce lien est invalide ou a expiré. Demande-en un nouveau.")
+    # Toutes les anciennes sessions sont révoquées ; on connecte directement cet appareil
+    _open_session(response, user)
+    return user_out(user)
 
 
 @router.get("/me", response_model=UserOut)
