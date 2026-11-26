@@ -82,8 +82,10 @@ class BrevoSender:
             with urllib.request.urlopen(request, timeout=self._timeout):
                 pass  # 2xx : Brevo a accepté l'e-mail
         except urllib.error.HTTPError as exc:
-            # 401 = clé invalide, expirée ou IP non autorisée ; 400 = e-mail mal formé
-            detail = exc.read(500).decode(errors="replace")
+            # 401 = clé invalide, expirée ou IP non autorisée ; 400 = e-mail mal formé.
+            # La réponse d'erreur est une connexion ouverte : on la ferme après lecture.
+            with exc:
+                detail = exc.read(500).decode(errors="replace")
             raise EmailError(f"Brevo a refusé l'envoi (HTTP {exc.code}) : {detail}") from exc
         except (urllib.error.URLError, TimeoutError) as exc:
             raise EmailError(f"Brevo injoignable : {exc}") from exc
