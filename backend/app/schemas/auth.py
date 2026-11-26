@@ -34,6 +34,27 @@ class LoginIn(ApiModel):
         return v.strip().lower()
 
 
+class ForgotPasswordIn(ApiModel):
+    email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def lower_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class ResetTokenIn(ApiModel):
+    token: str = Field(min_length=20, max_length=200)
+
+
+class ResetPasswordIn(ResetTokenIn):
+    password: str = Field(min_length=8, max_length=128)
+
+
+class MessageOut(ApiModel):
+    detail: str
+
+
 class UserOut(ApiModel):
     id: int
     email: str

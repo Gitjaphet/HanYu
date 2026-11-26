@@ -30,6 +30,8 @@ services:
       ENVIRONMENT: production
       CORS_ORIGINS: '["https://${DOMAIN:?DOMAIN manquant dans .env}"]'
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET manquant dans .env}
+      BREVO_API_KEY: ${BREVO_API_KEY:?BREVO_API_KEY manquant dans .env}
+      FRONTEND_URL: https://${DOMAIN}
       UVICORN_ROOT_PATH: /api
     networks:
       - internal
@@ -47,7 +49,7 @@ services:
       # Connexion et inscription : limite par adresse IP, appliquée par Traefik avant l'API.
       # Large (60/min) car une école connecte toute une classe depuis la même IP ;
       # la vraie protection contre la force brute est le blocage par e-mail dans l'API.
-      - traefik.http.routers.hanyu-auth.rule=Host(`${DOMAIN}`) && (Path(`/api/auth/login`) || Path(`/api/auth/register`))
+      - traefik.http.routers.hanyu-auth.rule=Host(`${DOMAIN}`) && (Path(`/api/auth/login`) || Path(`/api/auth/register`) || Path(`/api/auth/forgot-password`) || PathPrefix(`/api/auth/reset-password`))
       - traefik.http.routers.hanyu-auth.entrypoints=websecure
       - traefik.http.routers.hanyu-auth.tls.certresolver=letsencrypt
       - traefik.http.routers.hanyu-auth.middlewares=hanyu-auth-limit,hanyu-api-strip

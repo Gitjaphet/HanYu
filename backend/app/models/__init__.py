@@ -21,10 +21,11 @@ from app.models.lesson import (  # noqa: E402  (après la convention, exprès)
     VocabItem,
 )
 from app.models.login_attempt import LoginAttempt  # noqa: E402
+from app.models.password_reset import PasswordResetToken  # noqa: E402
 from app.models.progress import LessonProgress  # noqa: E402
 from app.models.user import User  # noqa: E402
 
 __all__ = [
-    "QUIZ_TYPES", "DialogueLine", "Lesson", "LessonProgress", "Level", "LoginAttempt", "QuizQuestion", "Unit", "User",
+    "QUIZ_TYPES", "DialogueLine", "Lesson", "LessonProgress", "Level", "LoginAttempt", "PasswordResetToken", "QuizQuestion", "Unit", "User",
     "VocabItem",
 ]

@@ -36,7 +36,12 @@ function LoginForm() {
 
       <form onSubmit={onSubmit} className="space-y-5">
         <AuthField id="email" name="email" type="email" label="E-mail" autoComplete="email" required />
-        <AuthField id="password" name="password" type="password" label="Mot de passe" autoComplete="current-password" required />
+        <div>
+          <AuthField id="password" name="password" type="password" label="Mot de passe" autoComplete="current-password" required />
+          <Link href="/forgot-password" className="mt-2 inline-block text-sm font-bold text-primary hover:underline">
+            Mot de passe oublié ?
+          </Link>
+        </div>
 
         {error && <p role="alert" className="text-sm font-bold text-red-600">{error}</p>}
 

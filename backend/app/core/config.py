@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     session_days: int = 7
 
+    # E-mails transactionnels (Brevo). Sans clé en développement : affichés dans la console.
+    brevo_api_key: str = ""
+    mail_from_email: str = "no-reply@medevstack.com"
+    mail_from_name: str = "HanYu"
+    # Adresse publique du site, pour construire les liens envoyés par e-mail
+    frontend_url: str = "http://localhost:3000"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
@@ -22,13 +29,15 @@ class Settings(BaseSettings):
         return self.environment == "production"
 
     @model_validator(mode="after")
-    def check_jwt_secret(self) -> "Settings":
+    def check_secrets(self) -> "Settings":
         if not self.jwt_secret:
             if self.is_production:
                 raise ValueError("JWT_SECRET manquant : obligatoire en production")
             self.jwt_secret = secrets.token_urlsafe(32)
         elif len(self.jwt_secret) < 32:
             raise ValueError("JWT_SECRET trop court : 32 caractères minimum")
+        if self.is_production and not self.brevo_api_key:
+            raise ValueError("BREVO_API_KEY manquant : obligatoire en production")
         return self
 
 
