@@ -107,3 +107,15 @@ def test_panne_de_brevo_ne_casse_pas_la_reponse(client, session, caplog):
     response = client.post("/auth/forgot-password", json={"email": "eleve@example.com"})
     assert response.status_code == 202
     assert "Échec de l'e-mail de réinitialisation" in caplog.text
+
+
+def test_verification_du_lien_a_l_ouverture(client, outbox):
+    register(client)
+    client.post("/auth/forgot-password", json={"email": "eleve@example.com"})
+    token = token_from(outbox[0])
+
+    assert client.post("/auth/reset-password/verify", json={"token": token}).status_code == 204
+    assert client.post("/auth/reset-password/verify", json={"token": token}).status_code == 204  # vérifier ne consomme pas
+    client.post("/auth/reset-password", json={"token": token, "password": "nouveau-mdp-1"})
+    assert client.post("/auth/reset-password/verify", json={"token": token}).status_code == 400
+    assert client.post("/auth/reset-password/verify", json={"token": "x" * 43}).status_code == 400

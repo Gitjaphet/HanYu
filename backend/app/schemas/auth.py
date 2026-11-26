@@ -43,8 +43,11 @@ class ForgotPasswordIn(ApiModel):
         return v.strip().lower()
 
 
-class ResetPasswordIn(ApiModel):
+class ResetTokenIn(ApiModel):
     token: str = Field(min_length=20, max_length=200)
+
+
+class ResetPasswordIn(ResetTokenIn):
     password: str = Field(min_length=8, max_length=128)
 
 

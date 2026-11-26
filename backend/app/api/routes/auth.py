@@ -18,12 +18,13 @@ from app.schemas.auth import (
     MessageOut,
     RegisterIn,
     ResetPasswordIn,
+    ResetTokenIn,
     UserOut,
     user_out,
 )
 from app.services.email import EmailSenderDep
 from app.services.login_throttle import clear_failures, record_failure, retry_after
-from app.services.password_reset import issue_token, reset_password
+from app.services.password_reset import find_valid, issue_token, reset_password
 from app.services.reset_mail import build_reset_email, reset_link, send_reset_email
 
 # Même réponse que le compte existe ou non : on ne révèle pas qui est inscrit
@@ -113,11 +114,22 @@ def forgot_password(
     return MessageOut(detail=FORGOT_MESSAGE)
 
 
+INVALID_LINK = "Ce lien est invalide ou a expiré. Demande-en un nouveau."
+
+
+@router.post("/reset-password/verify", status_code=status.HTTP_204_NO_CONTENT)
+def verify_reset_token(data: ResetTokenIn, session: SessionDep) -> None:
+    """La page vérifie le lien dès son ouverture : inutile de taper un mot de passe pour un lien mort.
+    POST et non GET : le jeton reste dans le corps de la requête, jamais dans une adresse journalisée."""
+    if find_valid(session, data.token) is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=INVALID_LINK)
+
+
 @router.post("/reset-password", response_model=UserOut)
 def reset_password_route(data: ResetPasswordIn, response: Response, session: SessionDep) -> UserOut:
     user = reset_password(session, data.token, data.password)
     if user is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Ce lien est invalide ou a expiré. Demande-en un nouveau.")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=INVALID_LINK)
     # Toutes les anciennes sessions sont révoquées ; on connecte directement cet appareil
     _open_session(response, user)
     return user_out(user)
