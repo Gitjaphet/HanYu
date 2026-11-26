@@ -16,6 +16,7 @@ interface UserState {
   login: (data: auth.LoginData) => Promise<void>;
   register: (data: auth.RegisterData) => Promise<void>;
   logout: () => Promise<void>;
+  resetPassword: (token: string, password: string) => Promise<void>;
 }
 
 /** Un compte vient d'être reconnu : sa progression locale et celle du serveur sont réunies. */
@@ -45,6 +46,12 @@ export const useUserStore = create<UserState>()((set) => ({
 
   register: async (data) => {
     const user = await auth.register(data);
+    set({ user, status: "authenticated" });
+    connected(user);
+  },
+
+  resetPassword: async (token, password) => {
+    const user = await auth.resetPassword(token, password);
     set({ user, status: "authenticated" });
     connected(user);
   },
