@@ -1,548 +1,365 @@
-// app/(app)/lesson/[id]/vocab/page.tsx
+// app/(app)/lesson/[id]/vocab/page.tsx — partie 1 : écouter chaque mot puis le répéter au micro
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowLeft, CheckCircle2, ChevronRight, Mic, MicOff, RotateCcw, Snail, Volume2 } from "lucide-react";
 import { useLesson } from "@/hooks/useLessons";
 import { useProgressStore } from "@/store/progressStore";
 import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
-import { VocabItem } from "@/types";
-import { ArrowLeft, Volume2, Mic, MicOff, ChevronRight, RotateCcw, CheckCircle2 } from "lucide-react";
-import Lottie from "lottie-react";
-import PandaMascot, { PandaState } from "@/components/lesson/PandaMascot/PandaMascot";
+import { QuitDialog } from "@/components/lesson/QuitDialog/QuitDialog";
+import PandaMascot, { type PandaState } from "@/components/lesson/PandaMascot/PandaMascot";
+import {
+  listenOnce,
+  matchesHanzi,
+  speak,
+  speakRepeatAfterMe,
+  stopSpeaking,
+  type ListenError,
+  type Listening,
+} from "@/lib/speech";
+import type { VocabItem } from "@/types";
 
-// ─── URLs Lottie (lottiefiles.com — 100% gratuit) ────────────────────────────
-const LOTTIE_SUCCESS = "https://lottie.host/9dce9a92-d074-4db5-a17b-d22699d3e5b5/3GnFvBRPxN.json";
-const LOTTIE_ERROR   = "https://lottie.host/b3d84d68-c2b3-4f78-9a9d-bb47e01c9a77/JNfaKLdxSK.json";
-const LOTTIE_MIC     = "https://lottie.host/7c85cc78-f39b-4a9f-8a11-fde7e7e10dd4/dVlPGbkxpW.json";
-
-// ─── Constantes ───────────────────────────────────────────────────────────────
 const LISTEN_TIMEOUT_MS = 15000;
-const MAX_ATTEMPTS      = 2;
+const TRIES = 3; // première écoute + 2 nouvelles tentatives
 
-type MicState = "idle" | "listening" | "success" | "fail";
+type Phase = "waiting" | "speaking" | "listening" | "success" | "fail";
 
-// ─── Composant animation micro ────────────────────────────────────────────────
-function MicWave({ isListening }: { isListening: boolean }) {
-  const [anim, setAnim] = useState<any>(null);
-
-  useEffect(() => {
-    fetch(LOTTIE_MIC)
-      .then((r) => r.json())
-      .then(setAnim)
-      .catch(() => setAnim(null));
-  }, []);
-
-  if (!anim || !isListening) return null;
-  return (
-    <div className="w-16 h-16 sm:w-20 sm:h-20">
-      <Lottie animationData={anim} loop={true} />
-    </div>
-  );
-}
+const PANDA: Record<Phase, PandaState> = {
+  waiting: "idle",
+  speaking: "speaking",
+  listening: "listening",
+  success: "success",
+  fail: "fail",
+};
 
 export default function VocabPage() {
   const params = useParams<{ id: string }>();
-  const router  = useRouter();
+  const router = useRouter();
   const { lesson, loading, error } = useLesson(Number(params.id));
   const completeVocab = useProgressStore((s) => s.completeVocab);
 
-
-  const [hasStarted, setHasStarted] = useState(false);
-  const [idx, setIdx]           = useState(0);
-  const [micState, setMicState] = useState<MicState>("idle");
-  const [attempts, setAttempts] = useState(0);
-  const [heard, setHeard]       = useState("");
-  const [pandaState, setPandaState] = useState<PandaState>("idle");
-  const [showExample, setShowExample] = useState(false);
-
-  // Animations Lottie
-  const [successAnim, setSuccessAnim] = useState<any>(null);
-  const [errorAnim,   setErrorAnim]   = useState<any>(null);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [showError,   setShowError]   = useState(false);
-
-  // Animation d'entrée de la card
-  const [cardVisible, setCardVisible] = useState(false);
-
-  // ── Modale retour ──────────────────────────────────────────────────────────
-  const [showBackConfirm, setShowBackConfirm] = useState(false);
-
-  const timeoutRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const recognRef   = useRef<any>(null);
-  const hasAutoRef  = useRef(false);
+  // iOS n'autorise le son et le micro qu'après un geste de l'utilisateur : d'où l'écran « Démarrer »
+  const [started, setStarted] = useState(false);
+  const [idx, setIdx] = useState(0);
+  const [confirmQuit, setConfirmQuit] = useState(false);
 
   const vocab: VocabItem[] = lesson?.vocabulaire ?? [];
-  const current            = vocab[idx];
-  const progress           = vocab.length > 0 ? (idx / vocab.length) * 100 : 0;
-  const isLast             = idx === vocab.length - 1;
 
-  // ─── Chargement des animations Lottie ──────────────────────────────────
-  useEffect(() => {
-    fetch(LOTTIE_SUCCESS).then((r) => r.json()).then(setSuccessAnim).catch(() => {});
-    fetch(LOTTIE_ERROR).then((r) => r.json()).then(setErrorAnim).catch(() => {});
-  }, []);
-
-  // ─── Animation d'entrée card ───────────────────────────────────────────
-  useEffect(() => {
-    setCardVisible(false);
-    const t = setTimeout(() => setCardVisible(true), 50);
-    return () => clearTimeout(t);
-  }, [idx]);
-
-  useEffect(() => {
-    if (micState === "listening") setPandaState("listening");
-    else if (micState === "success") setPandaState("success");
-    else if (micState === "fail")    setPandaState("fail");
-    else setPandaState("idle");
-  }, [micState]);
-
-  // ─── TTS ──────────────────────────────────────────────────────────────────
-  const speak = useCallback((text: string, slow = false): Promise<void> => {
-    return new Promise((resolve) => {
-      if (typeof window === "undefined" || !window.speechSynthesis) { resolve(); return; }
-      window.speechSynthesis.cancel();
-      const u   = new SpeechSynthesisUtterance(text);
-      u.lang    = "zh-CN";
-      u.rate    = slow ? 0.55 : 0.9;
-      u.onend   = () => resolve();
-      u.onerror = () => resolve();
-      window.speechSynthesis.speak(u);
-    });
-  }, []);
-
-  const speakInstruction = useCallback((hanzi: string): Promise<void> => {
-    return new Promise((resolve) => {
-        if (typeof window === "undefined" || !window.speechSynthesis) { resolve(); return; }
-        window.speechSynthesis.cancel();
-        setPandaState("speaking");
-        const intro  = new SpeechSynthesisUtterance("Répète après moi :");
-        intro.lang   = "fr-FR";
-        intro.rate   = 1;
-        const word   = new SpeechSynthesisUtterance(hanzi);
-        word.lang    = "zh-CN";
-        word.rate    = 0.85;
-        word.onend   = () => { setPandaState("idle"); resolve(); };
-        word.onerror = () => { setPandaState("idle"); resolve(); };
-        intro.onend  = () => window.speechSynthesis.speak(word);
-        window.speechSynthesis.speak(intro);
-    });
-  }, []);
-
-  // ─── Micro ────────────────────────────────────────────────────────────────
-  const stopListening = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    try { recognRef.current?.stop(); } catch (_) {}
-    recognRef.current = null;
-  }, []);
-
-  const startListening = useCallback((expectedHanzi: string, attemptNum: number) => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-
-    stopListening();
-    setMicState("listening");
-
-    const rec            = new SR();
-    rec.lang             = "zh-CN";
-    rec.interimResults   = false;
-    rec.maxAlternatives  = 3;
-    recognRef.current    = rec;
-
-    timeoutRef.current = setTimeout(async () => {
-      stopListening();
-      if (attemptNum < MAX_ATTEMPTS) {
-        setAttempts((a) => a + 1);
-        setMicState("idle");
-        await speakInstruction(expectedHanzi);
-        startListening(expectedHanzi, attemptNum + 1);
-      } else {
-        setMicState("fail");
-        setHeard("");
-        // Animation erreur
-        setShowError(true);
-        setTimeout(() => setShowError(false), 2500);
-      }
-    }, LISTEN_TIMEOUT_MS);
-
-    rec.onresult = (e: any) => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      stopListening();
-      const results: string[] = [];
-      for (let i = 0; i < e.results[0].length; i++) results.push(e.results[0][i].transcript);
-      const top   = results[0];
-      setHeard(top);
-      const clean = (s: string) => s.replace(/[\s，。！？、]/g, "");
-      const ok    = results.some((r) => clean(r) === clean(expectedHanzi));
-
-      if (ok) {
-        setMicState("success");
-        // Animation succès
-        setShowSuccess(true);
-        setTimeout(() => setShowSuccess(false), 2500);
-      } else if (attemptNum < MAX_ATTEMPTS) {
-        setAttempts((a) => a + 1);
-        setMicState("idle");
-        setTimeout(async () => {
-          await speakInstruction(expectedHanzi);
-          startListening(expectedHanzi, attemptNum + 1);
-        }, 600);
-      } else {
-        setMicState("fail");
-        setShowError(true);
-        setTimeout(() => setShowError(false), 2500);
-      }
-    };
-
-    rec.onerror = () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      setMicState("fail");
-      setShowError(true);
-      setTimeout(() => setShowError(false), 2500);
-    };
-
-    rec.start();
-  }, [speakInstruction, stopListening]);
-
-  // ─── Séquence auto à chaque nouveau mot ──────────────────────────────────
-  useEffect(() => {
-    if (!current || !hasStarted) return;
-    hasAutoRef.current = false;
-    setMicState("idle");
-    setAttempts(0);
-    setHeard("");
-    setShowExample(false);
-    setShowSuccess(false);
-    setShowError(false);
-
-    let cancelled = false;
-
-    (async () => {
-      await new Promise((r) => setTimeout(r, 500));
-      if (cancelled || hasAutoRef.current) return;
-      hasAutoRef.current = true;
-      await speakInstruction(current.hanzi);
-      if (cancelled) return;
-      startListening(current.hanzi, 0);
-    })();
-
-    return () => {
-      cancelled = true;
-      stopListening();
-      window.speechSynthesis?.cancel();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, hasStarted]);
-
-
-  // ─── Navigation ───────────────────────────────────────────────────────────
   const goNext = useCallback(() => {
-    stopListening();
-    window.speechSynthesis?.cancel();
-    if (isLast) {
-      if (lesson) completeVocab(lesson.id);
-      router.push(`/lesson/${lesson?.id}/dialogue`);
-    } else {
+    if (!lesson) return;
+    if (idx < vocab.length - 1) {
       setIdx((i) => i + 1);
+    } else {
+      completeVocab(lesson.id);
+      router.push(`/lesson/${lesson.id}/dialogue`);
     }
-  }, [isLast, lesson, completeVocab, router, stopListening]);
+  }, [idx, vocab.length, lesson, completeVocab, router]);
 
-  const handleRetry = useCallback(async () => {
-    setAttempts(0);
-    setMicState("idle");
-    setHeard("");
-    setShowSuccess(false);
-    setShowError(false);
-    await speakInstruction(current.hanzi);
-    startListening(current.hanzi, 0);
-  }, [current, speakInstruction, startListening]);
-
-  // ─── Retour ───────────────────────────────────────────────────────────────
-  const handleBack = useCallback(() => {
-    stopListening();
-    window.speechSynthesis?.cancel();
-    setShowBackConfirm(true);
-  }, [stopListening]);
+  const stay = useCallback(() => setConfirmQuit(false), []);
 
   if (loading) return <LessonLoading />;
-  if (!lesson || vocab.length === 0) {
-    return <LessonUnavailable error={error} />;
-  }
+  if (!lesson || vocab.length === 0) return <LessonUnavailable error={error} />;
 
-  // NOUVEAU : Écran de lancement obligatoire pour iOS
-  if (!hasStarted) {
+  if (!started) {
     return (
-      <div className="fixed inset-0 bg-background z-[90] flex flex-col items-center justify-center p-6 select-none">
-        <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center text-4xl mb-4 animate-bounce">
-          🎙️
-        </div>
-        <h2 className="text-2xl sm:text-3xl font-black text-text text-center mb-2">Prêt à parler ?</h2>
-        <p className="text-sm text-text-muted text-center max-w-xs mb-8">
-          Assure-toi que le son est activé et autorise l'accès au micro.
+      <div className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-background p-6 select-none">
+        <span className="mb-5 flex h-24 w-24 items-center justify-center rounded-full bg-tint text-primary">
+          <Mic size={40} aria-hidden="true" />
+        </span>
+        <h2 className="mb-2 text-center text-2xl font-black text-text sm:text-3xl">Prêt à parler ?</h2>
+        <p className="mb-8 max-w-xs text-center text-sm text-text-muted">
+          Active le son et autorise le micro : tu vas écouter chaque mot, puis le répéter.
         </p>
         <button
-          onClick={() => setHasStarted(true)}
-          className="w-full max-w-xs py-4 rounded-xl bg-primary text-white font-bold text-lg shadow-lg hover:scale-105 active:scale-95 transition-all"
+          type="button"
+          onClick={() => setStarted(true)}
+          className="w-full max-w-xs rounded-xl bg-primary py-4 text-lg font-bold text-white shadow-lg transition hover:bg-primary-dark active:scale-95"
         >
-          Démarrer l'exercice
+          Démarrer l&apos;exercice
+        </button>
+        <button type="button" onClick={() => router.push("/")} className="mt-4 text-sm font-bold text-text-muted hover:text-text">
+          Plus tard
         </button>
       </div>
     );
   }
 
+  const progress = (idx / vocab.length) * 100;
+
   return (
-    <div className="fixed inset-0 bg-background z-[90] flex flex-col h-[100dvh] select-none overflow-hidden">
-
-      {/* ── Modale confirmation retour ── */}
-      {showBackConfirm && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 px-6">
-          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl flex flex-col gap-4">
-            <h3 className="text-lg font-black text-text">Quitter le vocabulaire ?</h3>
-            <p className="text-sm text-text-muted">Ta progression dans cette session sera perdue.</p>
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <button
-                onClick={() => {
-                  setShowBackConfirm(false);
-                  // reprendre la séquence audio
-                  speakInstruction(current.hanzi).then(() => startListening(current.hanzi, 0));
-                }}
-                className="px-5 py-3 rounded-xl bg-border text-text-muted font-bold text-sm hover:bg-border/70 transition"
-              >
-                Continuer la leçon
-              </button>
-              <button
-                onClick={() => router.push("/")}
-                className="px-5 py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition"
-              >
-                Quitter
-              </button>
-            </div>
-          </div>
-        </div>
+    <div className="fixed inset-0 z-[90] flex h-[100dvh] flex-col overflow-hidden bg-background select-none">
+      {confirmQuit && (
+        <QuitDialog title="Quitter le vocabulaire ?" onStay={stay} onQuit={() => router.push("/")} />
       )}
 
-      {/* ── Overlay Lottie succès ── */}
-      {showSuccess && successAnim && (
-        <div className="pointer-events-none fixed inset-0 z-[200] flex items-center justify-center">
-          <div className="w-56 h-56 sm:w-72 sm:h-72">
-            <Lottie animationData={successAnim} loop={false} />
-          </div>
-        </div>
-      )}
-
-      {/* ── Overlay Lottie erreur ── */}
-      {showError && errorAnim && (
-        <div className="pointer-events-none fixed inset-0 z-[200] flex items-center justify-center">
-          <div className="w-44 h-44 sm:w-56 sm:h-56">
-            <Lottie animationData={errorAnim} loop={false} />
-          </div>
-        </div>
-      )}
-
-      {/* ── HEADER ── */}
-      <div className="max-w-2xl w-full mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center gap-3 sm:gap-4">
+      {/* En-tête : retour + progression */}
+      <div className="mx-auto flex w-full max-w-2xl items-center gap-3 px-3 py-2 sm:gap-4 sm:px-4 sm:py-3">
         <button
-          onClick={handleBack}
-          className="text-text-muted hover:text-text transition p-2 -ml-1 rounded-lg hover:bg-border/40"
-          title="Retour"
+          type="button"
+          onClick={() => setConfirmQuit(true)}
+          aria-label="Quitter le vocabulaire"
+          className="-ml-1 rounded-lg p-2 text-text-muted transition hover:bg-tint hover:text-text"
         >
           <ArrowLeft size={20} />
         </button>
-        <div className="flex-1 h-2 sm:h-2.5 bg-border rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary rounded-full transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
+        <div className="h-2 flex-1 overflow-hidden rounded-full bg-border sm:h-2.5" role="progressbar"
+          aria-valuenow={idx} aria-valuemin={0} aria-valuemax={vocab.length} aria-label="Progression">
+          <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }} />
         </div>
-        <span className="text-xs font-bold text-text-muted tabular-nums whitespace-nowrap">
+        <span className="whitespace-nowrap text-xs font-bold text-text-muted tabular-nums">
           {idx + 1} / {vocab.length}
         </span>
       </div>
 
-      {/* Label partie */}
-      <div className="max-w-2xl w-full mx-auto px-3 sm:px-4 mb-1 sm:mb-2">
-        <span className="text-[10px] uppercase tracking-widest font-bold text-primary/70">
+      <div className="mx-auto mb-1 w-full max-w-2xl px-3 sm:mb-2 sm:px-4">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
           Partie 1 · Vocabulaire — {lesson.title}
         </span>
       </div>
 
-      {/* ── ZONE CENTRALE ── */}
-      <div className="flex-1 max-w-2xl w-full mx-auto px-3 sm:px-4 flex flex-col justify-center gap-3 sm:gap-4 overflow-y-auto pb-4">
+      {/* Un composant par mot : en changeant de mot, tout son état repart de zéro (key) */}
+      <WordStep
+        key={idx}
+        word={vocab[idx]}
+        isLast={idx === vocab.length - 1}
+        paused={confirmQuit}
+        onNext={goNext}
+      />
+    </div>
+  );
+}
 
-        {/* Card mot — animation slide-up à chaque nouveau mot */}
-        <div
-          className={`bg-card border border-border rounded-2xl shadow-sm p-4 sm:p-6 flex flex-col items-center text-center gap-2
-            transition-all duration-300
-            ${cardVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}
-          `}
+type WordStepProps = {
+  word: VocabItem;
+  isLast: boolean;
+  paused: boolean; // fenêtre « Quitter ? » ouverte : on se tait et on n'écoute plus
+  onNext: () => void;
+};
+
+function WordStep({ word, isLast, paused, onNext }: WordStepProps) {
+  const [phase, setPhase] = useState<Phase>("waiting");
+  const [attempt, setAttempt] = useState(0);
+  const [heard, setHeard] = useState("");
+  const [problem, setProblem] = useState<ListenError | null>(null);
+  const [showExample, setShowExample] = useState(false);
+
+  const runId = useRef(0); // chaque séquence a un numéro : une séquence remplacée s'arrête d'elle-même
+  const listening = useRef<Listening | null>(null);
+  const settled = useRef(false); // réussi ou abandonné : on ne relance plus tout seul
+
+  const cancel = useCallback(() => {
+    runId.current += 1;
+    listening.current?.stop();
+    stopSpeaking();
+  }, []);
+
+  /** « Répète après moi », puis écoute, jusqu'à TRIES essais. */
+  const run = useCallback(async () => {
+    const id = ++runId.current;
+    const alive = () => runId.current === id;
+    settled.current = false;
+    setProblem(null);
+    setHeard("");
+
+    for (let i = 0; i < TRIES; i++) {
+      setAttempt(i);
+      setPhase("speaking");
+      await speakRepeatAfterMe(word.hanzi);
+      if (!alive()) return;
+
+      setPhase("listening");
+      listening.current = listenOnce({ timeoutMs: LISTEN_TIMEOUT_MS });
+      const { heard: candidates, error } = await listening.current.result;
+      if (!alive() || error === "aborted") return;
+
+      if (error === "unsupported" || error === "denied") {
+        setProblem(error); // inutile de réessayer : l'élève doit agir (navigateur ou autorisation)
+        break;
+      }
+      setHeard(candidates[0] ?? "");
+      if (matchesHanzi(candidates, word.hanzi)) {
+        settled.current = true;
+        setPhase("success");
+        return;
+      }
+    }
+    settled.current = true;
+    setPhase("fail");
+  }, [word.hanzi]);
+
+  // Démarre (ou reprend) la séquence, sauf pendant la fenêtre « Quitter ? » ou une fois le mot terminé
+  useEffect(() => {
+    if (paused || settled.current) return;
+    const timer = setTimeout(run, 500);
+    return () => {
+      clearTimeout(timer);
+      cancel();
+    };
+  }, [paused, run, cancel]);
+
+  const next = () => {
+    cancel();
+    onNext();
+  };
+
+  const status =
+    problem === "unsupported" ? "Ton navigateur ne sait pas écouter. Utilise Chrome, Edge ou Safari, ou passe ce mot."
+    : problem === "denied" ? "Le micro est bloqué : autorise-le dans ton navigateur, puis réessaie."
+    : phase === "speaking" ? "Écoute bien…"
+    : phase === "listening" ? "Parle maintenant…"
+    : phase === "success" ? "Bonne prononciation !"
+    : phase === "fail" ? (heard ? `Entendu : « ${heard} »` : "Pas de réponse détectée")
+    : "Prépare-toi…";
+
+  const busy = phase === "speaking" || phase === "listening";
+
+  return (
+    <>
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-3 overflow-y-auto px-3 pb-4 sm:gap-4 sm:px-4">
+        {/* Carte du mot */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 text-center shadow-sm sm:p-6"
         >
-          {/* Hanzi — bounce léger à l'apparition */}
-          <h2
-            className={`text-6xl sm:text-7xl md:text-8xl font-black text-text leading-none tracking-tight
-              transition-all duration-500
-              ${cardVisible ? "scale-100" : "scale-90"}
-            `}
-            style={{ fontFamily: "'Noto Serif SC', serif" }}
-          >
-            {current.hanzi}
+          <h2 className="font-hanzi text-6xl font-black leading-none tracking-tight text-text sm:text-7xl md:text-8xl">
+            {word.hanzi}
           </h2>
+          <p className="mt-1 text-lg font-bold tracking-widest text-primary sm:text-xl">{word.pinyin}</p>
+          <p className="mt-0.5 text-sm font-semibold text-text-muted sm:text-base">{word.french}</p>
+          <ListenButtons text={word.hanzi} disabled={busy} />
+        </motion.div>
 
-          {/* Pinyin */}
-          <p className="text-lg sm:text-xl font-bold text-primary tracking-widest mt-1">
-            {current.pinyin}
+        {/* Zone micro */}
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 sm:gap-3 sm:p-5">
+          <PandaMascot state={PANDA[phase]} word={word.hanzi} />
+          <p role="status" aria-live="polite"
+            className={`text-center text-xs font-bold uppercase tracking-wider ${problem ? "text-warning" : "text-text-muted"}`}>
+            {status}
           </p>
-
-          {/* Traduction */}
-          <p className="text-sm sm:text-base font-semibold text-text-muted mt-0.5">
-            {current.french}
-          </p>
-
-          {/* Boutons audio */}
-          <div className="flex items-center gap-2 mt-2 sm:mt-3">
-            <button
-              onClick={() => speak(current.hanzi, false)}
-              className="flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs px-3 sm:px-4 py-2 rounded-lg transition active:scale-95"
-            >
-              <Volume2 size={13} /> Normal
-            </button>
-            <button
-              onClick={() => speak(current.hanzi, true)}
-              className="flex items-center gap-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 font-bold text-xs px-3 sm:px-4 py-2 rounded-lg transition active:scale-95"
-            >
-              🐢 Lent
-            </button>
-          </div>
-        </div>
-
-        {/* ── ZONE MICRO ── */}
-        <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 flex flex-col items-center gap-2 sm:gap-3">
-          {/* Panda mascotte */}
-          <PandaMascot state={pandaState} word={current.hanzi} />
-          <p className="text-xs font-bold uppercase tracking-wider text-text-muted text-center">
-            {micState === "idle"      && attempts === 0 && "Écoute et répète…"}
-            {micState === "idle"      && attempts >  0  && `Tentative ${attempts + 1} / ${MAX_ATTEMPTS + 1} — réessaie !`}
-            {micState === "listening"                   && "🎙 Parle maintenant…"}
-            {micState === "success"                     && "✓ Bonne prononciation !"}
-            {micState === "fail"      && heard          && `Entendu : "${heard}"`}
-            {micState === "fail"      && !heard         && "Pas de réponse détectée"}
-          </p>
-
-          {/* Lottie onde micro OU bouton micro classique */}
-          {micState === "listening" ? (
-            <MicWave isListening={true} />
-          ) : (
-            <button
-              onClick={handleRetry}
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-md transition-all
-                ${micState === "success"
-                  ? "bg-green-500 text-white cursor-default"
-                  : micState === "fail"
-                  ? "bg-amber-500 text-white hover:opacity-90 active:scale-95"
-                  : "bg-primary text-white hover:opacity-90 active:scale-95 animate-pulse"
-                }
-              `}
-            >
-              {micState === "success"
-                ? <CheckCircle2 size={24} />
-                : micState === "fail"
-                ? <MicOff size={22} />
-                : <Mic size={22} />
-              }
-            </button>
+          {attempt > 0 && busy && (
+            <p className="text-xs font-bold text-warning">Essai {attempt + 1} / {TRIES}</p>
           )}
 
-          {/* Feedback succès */}
-          {micState === "success" && (
-            <p className="text-green-600 text-xs font-bold bg-green-50 px-3 py-1.5 rounded-lg animate-bounce">
-              🎉 Parfait ! Tu peux passer au mot suivant.
-            </p>
-          )}
+          <MicButton phase={phase} onRetry={() => void run()} />
 
-          {/* Feedback échec */}
-          {micState === "fail" && (
+          <AnimatePresence>
+            {phase === "success" && (
+              <motion.p
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="rounded-lg bg-success-soft px-3 py-1.5 text-xs font-bold text-success"
+              >
+                Parfait ! Tu peux passer au mot suivant.
+              </motion.p>
+            )}
+          </AnimatePresence>
+
+          {phase === "fail" && (
             <div className="flex gap-2">
-              <button
-                onClick={handleRetry}
-                className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 font-bold text-xs px-3 py-2 rounded-lg transition active:scale-95"
-              >
-                <RotateCcw size={13} className="animate-spin-once" /> Réessayer
+              <button type="button" onClick={() => void run()}
+                className="flex items-center gap-1.5 rounded-lg bg-warning-soft px-3 py-2 text-xs font-bold text-warning transition active:scale-95">
+                <RotateCcw size={13} aria-hidden="true" /> Réessayer
               </button>
-              <button
-                onClick={goNext}
-                className="flex items-center gap-1.5 bg-border hover:bg-border/70 text-text-muted font-bold text-xs px-3 py-2 rounded-lg transition active:scale-95"
-              >
-                Passer <ChevronRight size={13} />
+              <button type="button" onClick={next}
+                className="flex items-center gap-1.5 rounded-lg bg-tint px-3 py-2 text-xs font-bold text-text-muted transition hover:text-text active:scale-95">
+                Passer <ChevronRight size={13} aria-hidden="true" />
               </button>
             </div>
           )}
         </div>
 
-        {/* ── EXEMPLE ── */}
-        {current.example && (
-          <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        {/* Phrase d'exemple */}
+        {word.example && (
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
             <button
+              type="button"
               onClick={() => setShowExample((s) => !s)}
-              className="w-full px-4 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-text-muted hover:bg-border/30 transition"
+              aria-expanded={showExample}
+              className="flex w-full items-center justify-between px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-muted transition hover:bg-tint sm:px-5 sm:py-3.5"
             >
-              Voir la phrase d'exemple
-              <ChevronRight
-                size={14}
-                className={`transition-transform duration-300 ${showExample ? "rotate-90" : ""}`}
-              />
+              Voir la phrase d&apos;exemple
+              <ChevronRight size={14} aria-hidden="true"
+                className={`transition-transform duration-300 ${showExample ? "rotate-90" : ""}`} />
             </button>
             {showExample && (
-              <div className="px-4 sm:px-5 pb-4 flex flex-col gap-1 border-t border-border pt-3 animate-fade-in">
-                <p
-                  className="text-base sm:text-lg font-bold text-text"
-                  style={{ fontFamily: "'Noto Serif SC', serif" }}
-                >
-                  {current.example.hanzi}
-                </p>
-                <p className="text-sm font-semibold text-primary">{current.example.pinyin}</p>
-                <p className="text-sm text-text-muted">{current.example.french}</p>
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={() => speak(current.example!.hanzi, false)}
-                    className="flex items-center gap-1.5 bg-primary/10 text-primary font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-primary/20 transition active:scale-95"
-                  >
-                    <Volume2 size={12} /> Écouter
-                  </button>
-                  <button
-                    onClick={() => speak(current.example!.hanzi, true)}
-                    className="flex items-center gap-1.5 bg-orange-500/10 text-orange-600 font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-orange-500/20 transition active:scale-95"
-                  >
-                    🐢 Lent
-                  </button>
-                </div>
+              <div className="flex flex-col gap-1 border-t border-border px-4 pb-4 pt-3 sm:px-5">
+                <p className="font-hanzi text-base font-bold text-text sm:text-lg">{word.example.hanzi}</p>
+                <p className="text-sm font-semibold text-primary">{word.example.pinyin}</p>
+                <p className="text-sm text-text-muted">{word.example.french}</p>
+                <ListenButtons text={word.example.hanzi} disabled={busy} small />
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* ── FOOTER ── */}
-      <div className="border-t border-border bg-card px-3 sm:px-4 pt-3 sm:pt-4 pb-5 sm:pb-6">
-        <div className="max-w-2xl w-full mx-auto">
+      {/* Pied : passer au mot suivant */}
+      <div className="border-t border-border bg-card px-3 pb-5 pt-3 sm:px-4 sm:pb-6 sm:pt-4">
+        <div className="mx-auto w-full max-w-2xl">
           <button
-            onClick={goNext}
-            disabled={micState === "listening"}
-            className={`w-full py-3.5 sm:py-4 rounded-xl font-bold text-sm sm:text-base transition-all shadow-sm active:scale-[0.98]
-              ${micState === "success"
-                ? "bg-green-600 text-white hover:bg-green-700"
-                : micState === "listening"
-                ? "bg-border text-text-muted cursor-not-allowed"
-                : "bg-secondary text-white hover:opacity-90"
-              }
-            `}
+            type="button"
+            onClick={next}
+            disabled={phase === "listening"}
+            className={`w-full rounded-xl py-3.5 text-sm font-bold shadow-sm transition active:scale-[0.98] sm:py-4 sm:text-base disabled:cursor-not-allowed disabled:bg-border disabled:text-text-muted ${
+              phase === "success" ? "bg-success text-white hover:brightness-110" : "bg-secondary text-white hover:brightness-110"
+            }`}
           >
-            {micState === "success"
-              ? isLast ? "🎓 Terminer le vocabulaire →" : "✨ Mot suivant →"
-              : isLast ? "Terminer quand même →"         : "Passer ce mot →"
-            }
+            {phase === "success"
+              ? isLast ? "Terminer le vocabulaire →" : "Mot suivant →"
+              : isLast ? "Terminer quand même →" : "Passer ce mot →"}
           </button>
         </div>
       </div>
+    </>
+  );
+}
 
+function ListenButtons({ text, disabled, small = false }: { text: string; disabled: boolean; small?: boolean }) {
+  const size = small ? 12 : 13;
+  const base = `flex items-center gap-1.5 rounded-lg font-bold text-xs transition active:scale-95 disabled:opacity-50 ${small ? "px-3 py-1.5" : "px-3 py-2 sm:px-4"}`;
+  return (
+    <div className={`flex items-center gap-2 ${small ? "mt-2" : "mt-2 sm:mt-3"}`}>
+      <button type="button" disabled={disabled} onClick={() => void speak(text)}
+        className={`${base} bg-primary/10 text-primary hover:bg-primary/20`}>
+        <Volume2 size={size} aria-hidden="true" /> Normal
+      </button>
+      <button type="button" disabled={disabled} onClick={() => void speak(text, true)}
+        className={`${base} bg-tint text-secondary hover:brightness-95 dark:text-primary`}>
+        <Snail size={size} aria-hidden="true" /> Lent
+      </button>
     </div>
+  );
+}
+
+function MicButton({ phase, onRetry }: { phase: Phase; onRetry: () => void }) {
+  if (phase === "listening") {
+    // Onde qui pulse pendant l'écoute (remplace l'animation Lottie téléchargée)
+    return (
+      <span className="relative flex h-14 w-14 items-center justify-center sm:h-16 sm:w-16" aria-hidden="true">
+        <span className="absolute inset-0 animate-ping rounded-full bg-primary/30" />
+        <span className="relative flex h-full w-full items-center justify-center rounded-full bg-primary text-white shadow-md">
+          <Mic size={22} />
+        </span>
+      </span>
+    );
+  }
+  const success = phase === "success";
+  const fail = phase === "fail";
+  return (
+    <button
+      type="button"
+      onClick={onRetry}
+      disabled={success || phase === "speaking"}
+      aria-label={success ? "Mot réussi" : "Écouter et répéter de nouveau"}
+      className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-md transition sm:h-16 sm:w-16 ${
+        success ? "cursor-default bg-success" : fail ? "bg-warning hover:brightness-110 active:scale-95" : "bg-primary hover:bg-primary-dark active:scale-95"
+      }`}
+    >
+      {success ? <CheckCircle2 size={24} /> : fail ? <MicOff size={22} /> : <Mic size={22} />}
+    </button>
   );
 }
