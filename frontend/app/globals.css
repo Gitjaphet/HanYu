@@ -29,6 +29,15 @@
   --color-tertiary: #2E9E8A;
   --color-accent: #C2414B;
 
+  /* Retours à l'élève : réussite, à retenter, erreur. Toujours avec leur fond doux (-soft).
+     Plus de green-500 / red-500 / amber-500 dans les pages : ces trois couleurs suivent le thème. */
+  --color-success: #1B7461;
+  --color-success-soft: #E0F3EE;
+  --color-warning: #8C5806;
+  --color-warning-soft: #FBEFD8;
+  --color-danger: #AE3540;
+  --color-danger-soft: #F9E4E6;
+
   /* Formes et ombres */
   --radius-lg: 20px;
   --radius-md: 12px;
@@ -63,6 +72,13 @@
   --color-secondary: #5361B0;
   --color-tertiary: #5FC8B4;
   --color-accent: #F4A0A6;
+
+  --color-success: #5FC8B4;
+  --color-success-soft: #1D3A3A;
+  --color-warning: #E9B65A;
+  --color-warning-soft: #3A3122;
+  --color-danger: #F4A0A6;
+  --color-danger-soft: #3E2433;
 
   --shadow-hover: 0 16px 40px rgba(0, 0, 0, 0.45);
   --shadow-primary: 0 7px 22px rgba(117, 132, 218, 0.35);
