@@ -1,67 +1,37 @@
-// src/app/(app)/jeux/page.tsx
+// app/(app)/jeux/page.tsx — l'accueil des jeux, construit à partir du catalogue
 import Link from "next/link";
-import { Gamepad2, Keyboard, Puzzle } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import { GAMES } from "@/lib/games";
+import { GameIcon } from "@/components/games/GameIcon";
 import PandaMascot from "@/components/lesson/PandaMascot/PandaMascot";
 
 export default function GamesPage() {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
-      
-      {/* En-tête global avec Mascotte */}
-      <div className="flex flex-col sm:flex-row items-center gap-6 mb-10 bg-card p-6 sm:p-8 rounded-3xl border border-border shadow-sm">
-        <div className="w-32 h-32 shrink-0">
+    <div className="space-y-6">
+      <section className="flex flex-col items-center gap-4 rounded-3xl border border-border bg-card p-6 shadow-sm sm:flex-row sm:gap-6 sm:p-8">
+        <div className="h-28 w-28 shrink-0 sm:h-32 sm:w-32">
           <PandaMascot state="success" />
         </div>
         <div className="text-center sm:text-left">
-          <h1 className="text-3xl sm:text-4xl font-black text-text mb-2">Espace Jeux 🎮</h1>
-          <p className="text-text-muted font-medium text-lg">
-            Apprends en t'amusant ! Choisis un jeu pour réviser ton vocabulaire.
+          <h1 className="mb-2 text-3xl font-black text-text sm:text-4xl">Jeux</h1>
+          <p className="text-base font-medium text-text-muted sm:text-lg">
+            Révise ton vocabulaire en t&apos;amusant : choisis un jeu.
           </p>
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* 1. Hanzi Hunt (Actif) */}
-        <Link 
-          href="/jeux/hanzi-hunt"
-          className="bg-card border-2 border-border rounded-2xl p-6 hover:border-primary transition-all group shadow-sm active:scale-[0.98]"
-        >
-          <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-            <Gamepad2 size={24} />
-          </div>
-          <h2 className="text-xl font-bold text-text mb-1">Hanzi Hunt</h2>
-          <p className="text-sm text-text-muted">
-            Entraîne ta mémoire ! Trouve les paires de cartes avant la fin du temps.
-          </p>
-        </Link>
-
-        {/* 2. Speed Typing (Actif) */}
-        <Link 
-          href="/jeux/speed-typing"
-          className="bg-card border-2 border-border rounded-2xl p-6 hover:border-orange-500 transition-all group shadow-sm active:scale-[0.98]"
-        >
-          <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-            <Keyboard size={24} />
-          </div>
-          <h2 className="text-xl font-bold text-text mb-1">Speed Typing</h2>
-          <p className="text-sm text-text-muted">
-            Lis le pinyin ou le français et tape le hanzi le plus vite possible !
-          </p>
-        </Link>
-
-        {/* 3. Phrase Mystère (Actif) */}
-        <Link 
-          href="/jeux/phrase-mystere"
-          className="bg-card border-2 border-border rounded-2xl p-6 hover:border-blue-500 transition-all group shadow-sm active:scale-[0.98]"
-        >
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-            <Puzzle size={24} />
-          </div>
-          <h2 className="text-xl font-bold text-text mb-1">Phrase Mystère</h2>
-          <p className="text-sm text-text-muted">
-            Remets les mots du dialogue dans le bon ordre. Idéal pour la grammaire !
-          </p>
-        </Link>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {GAMES.map((game) => (
+          <Link key={game.slug} href={`/jeux/${game.slug}`}
+            className="group flex flex-col rounded-2xl border-2 border-border bg-card p-5 shadow-sm transition hover:border-primary/50 hover:shadow-md active:scale-[0.98] sm:p-6">
+            <GameIcon game={game} className="mb-4 transition-transform group-hover:scale-110" />
+            <h2 className="mb-1 text-xl font-bold text-text">{game.title}</h2>
+            <p className="flex-1 text-sm text-text-muted">{game.pitch}</p>
+            <span className="mt-4 flex items-center gap-1 text-sm font-bold text-primary">
+              Jouer <ChevronRight size={16} aria-hidden="true" />
+            </span>
+          </Link>
+        ))}
       </div>
     </div>
   );
