@@ -25,7 +25,7 @@ export function SecuritySettings() {
   }
 
   return (
-    <div className="mb-10">
+    <section>
       <h2 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-3 ml-2">Sécurité</h2>
       <div className="bg-card border-2 border-border rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -36,8 +36,8 @@ export function SecuritySettings() {
               Téléphone perdu, ordinateur partagé ? Ferme toutes les autres sessions. Cet appareil reste connecté.
             </p>
             <p role="status" className="text-sm font-bold mt-1">
-              {state === "done" && <span className="text-tertiary">C&apos;est fait : tes autres appareils sont déconnectés.</span>}
-              {state === "error" && <span className="text-accent">Impossible pour le moment, réessaie plus tard.</span>}
+              {state === "done" && <span className="text-success">C&apos;est fait : tes autres appareils sont déconnectés.</span>}
+              {state === "error" && <span className="text-danger">Impossible pour le moment, réessaie plus tard.</span>}
             </p>
           </div>
         </div>
@@ -50,6 +50,6 @@ export function SecuritySettings() {
           {state === "pending" ? "Déconnexion…" : "Déconnecter les autres"}
         </button>
       </div>
-    </div>
+    </section>
   );
 }

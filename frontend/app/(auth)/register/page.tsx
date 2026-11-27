@@ -45,7 +45,7 @@ function RegisterForm() {
         <AuthField id="password" name="password" type="password" label="Mot de passe" autoComplete="new-password"
           required minLength={8} maxLength={128} hint="8 caractères minimum." />
 
-        {error && <p role="alert" className="text-sm font-bold text-red-600">{error}</p>}
+        {error && <p role="alert" className="text-sm font-bold text-danger">{error}</p>}
 
         <button type="submit" disabled={pending}
           className="w-full rounded-xl bg-primary py-3.5 font-bold text-white shadow-md transition hover:bg-primary-dark disabled:opacity-60">

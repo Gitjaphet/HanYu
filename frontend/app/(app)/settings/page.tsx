@@ -1,164 +1,97 @@
+// app/(app)/settings/page.tsx — paramètres : uniquement des réglages qui fonctionnent vraiment
 "use client";
 
-import { 
-  Settings, Hammer, User, Bell, Moon, Globe, 
-  CreditCard, ChevronRight, Volume2, Shield 
-} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { ChevronRight, KeyRound, LogOut, UserPlus } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { SecuritySettings } from "@/components/settings/SecuritySettings";
+import { useUserStore } from "@/store/userStore";
 
 export default function SettingsPage() {
-  return (
-    <div className="max-w-3xl mx-auto px-4 py-8 pb-24">
-      
-      {/* ── En-tête "En construction" ── */}
-      <div className="flex flex-col items-center text-center mb-10 bg-card p-6 sm:p-8 rounded-3xl border border-border shadow-sm">
-        
-        {/* Icône animée */}
-        <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
-          <div className="w-16 h-16 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center">
-            {/* L'engrenage tourne lentement */}
-            <Settings size={40} className="animate-[spin_6s_linear_infinite]" />
-          </div>
-          <div className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-md animate-bounce">
-            <Hammer size={24} className="text-secondary" />
-          </div>
-        </div>
-        
-        <h1 className="text-3xl sm:text-4xl font-black text-text mb-3">
-          Paramètres 🚧
-        </h1>
-        <p className="text-text-muted font-medium text-base sm:text-lg max-w-lg">
-          Ton centre de contrôle est en cours de montage ! <br className="hidden sm:block" />
-          Tu pourras bientôt y personnaliser ton interface, gérer tes notifications et sécuriser ton compte.
-        </p>
-      </div>
+  const router = useRouter();
+  const user = useUserStore((s) => s.user);
+  const logout = useUserStore((s) => s.logout);
+  const [leaving, setLeaving] = useState(false);
 
-      {/* ── Apparence (déjà fonctionnel) ── */}
-      <div className="mb-10">
-        <h2 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-3 ml-2">
-          Apparence
-        </h2>
-        <div className="bg-card border-2 border-border rounded-2xl p-4 shadow-sm flex items-center justify-between gap-4">
+  const signOut = () => {
+    setLeaving(true);
+    void logout().then(() => router.replace("/login"));
+  };
+
+  return (
+    <div className="mx-auto flex max-w-3xl flex-col gap-8">
+      <h1 className="text-3xl font-black text-text sm:text-4xl">Paramètres</h1>
+
+      <Section title="Apparence">
+        <div className="flex items-center justify-between gap-4 p-4">
           <div>
             <p className="font-bold text-text">Thème</p>
             <p className="text-sm text-text-muted">Clair ou sombre. Par défaut, HanYu suit le réglage de ton appareil.</p>
           </div>
           <ThemeToggle withLabel />
         </div>
-      </div>
+      </Section>
 
-      <SecuritySettings />
+      {user ? (
+        <>
+          <Section title="Mon compte">
+            <Row label="Pseudo" value={user.pseudo} />
+            <Row label="E-mail" value={user.email} />
+            <Link href="/forgot-password"
+              className="flex items-center justify-between gap-4 p-4 transition hover:bg-tint">
+              <span className="flex items-center gap-3">
+                <KeyRound size={20} className="shrink-0 text-primary" aria-hidden="true" />
+                <span>
+                  <span className="block font-bold text-text">Changer de mot de passe</span>
+                  <span className="block text-sm text-text-muted">Tu reçois un lien par e-mail pour en choisir un nouveau.</span>
+                </span>
+              </span>
+              <ChevronRight size={20} className="shrink-0 text-text-muted" aria-hidden="true" />
+            </Link>
+          </Section>
 
-      {/* ── Aperçu des paramètres (Flouté/Grisé) ── */}
-      <div className="opacity-50 select-none pointer-events-none grayscale-[40%] transition-all flex flex-col gap-6">
-        
-        {/* Bloc 1 : Abonnement Pro */}
-        <div className="bg-gradient-to-r from-orange-400 to-primary rounded-3xl p-6 text-white shadow-md flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-black mb-1 flex items-center gap-2">
-              HanYu Pro <span className="bg-white text-primary text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">Premium</span>
-            </h2>
-            <p className="text-sm font-medium opacity-90">Débloque tous les examens et supprime les pubs.</p>
-          </div>
-          <ChevronRight size={24} className="opacity-70" />
-        </div>
+          <SecuritySettings />
 
-        {/* Bloc 2 : Compte */}
-        <div>
-          <h2 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-3 ml-2">
-            Mon Compte
-          </h2>
-          <div className="bg-card border-2 border-border rounded-2xl overflow-hidden shadow-sm flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500">
-                  <User size={20} />
-                </div>
-                <div>
-                  <p className="font-bold text-text">Informations personnelles</p>
-                  <p className="text-xs text-text-muted">Nom, pseudo, e-mail</p>
-                </div>
-              </div>
-              <ChevronRight size={20} className="text-text-muted" />
-            </div>
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500">
-                  <Shield size={20} />
-                </div>
-                <div>
-                  <p className="font-bold text-text">Mot de passe et sécurité</p>
-                  <p className="text-xs text-text-muted">Modifier le mot de passe</p>
-                </div>
-              </div>
-              <ChevronRight size={20} className="text-text-muted" />
-            </div>
-          </div>
-        </div>
-
-        {/* Bloc 3 : Préférences */}
-        <div>
-          <h2 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-3 ml-2">
-            Préférences
-          </h2>
-          <div className="bg-card border-2 border-border rounded-2xl overflow-hidden shadow-sm flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-500">
-                  <Moon size={20} />
-                </div>
-                <p className="font-bold text-text">Mode Sombre</p>
-              </div>
-              {/* Faux Toggle */}
-              <div className="w-12 h-6 bg-slate-200 rounded-full relative">
-                <div className="w-5 h-5 bg-white rounded-full absolute left-0.5 top-0.5 shadow-sm"></div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-500">
-                  <Volume2 size={20} />
-                </div>
-                <p className="font-bold text-text">Effets sonores</p>
-              </div>
-              {/* Faux Toggle actif */}
-              <div className="w-12 h-6 bg-primary rounded-full relative">
-                <div className="w-5 h-5 bg-white rounded-full absolute right-0.5 top-0.5 shadow-sm"></div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center text-green-500">
-                  <Globe size={20} />
-                </div>
-                <div>
-                  <p className="font-bold text-text">Langue de l'interface</p>
-                  <p className="text-xs text-text-muted">Français</p>
-                </div>
-              </div>
-              <ChevronRight size={20} className="text-text-muted" />
-            </div>
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center text-red-500">
-                  <Bell size={20} />
-                </div>
-                <p className="font-bold text-text">Notifications</p>
-              </div>
-              <ChevronRight size={20} className="text-text-muted" />
-            </div>
-          </div>
-        </div>
-
-        {/* Bouton Déconnexion (Faux) */}
-        <div className="mt-4">
-          <button className="w-full py-4 rounded-xl font-bold text-red-500 bg-red-50 border border-red-100 text-center">
-            Se déconnecter
+          <button type="button" onClick={signOut} disabled={leaving}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-danger/30 bg-danger-soft py-4 font-bold text-danger transition hover:brightness-95 disabled:opacity-60">
+            <LogOut size={18} aria-hidden="true" /> {leaving ? "Déconnexion…" : "Se déconnecter"}
           </button>
-        </div>
+        </>
+      ) : (
+        <Section title="Mon compte">
+          <div className="flex flex-col items-start gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-text-muted">
+              Tu utilises HanYu sans compte : ta progression reste sur cet appareil. Crée un compte pour la retrouver partout.
+            </p>
+            <Link href="/register"
+              className="flex shrink-0 items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-extrabold text-white transition hover:bg-primary-dark">
+              <UserPlus size={16} aria-hidden="true" /> Créer un compte
+            </Link>
+          </div>
+        </Section>
+      )}
+    </div>
+  );
+}
 
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="mb-3 ml-2 text-sm font-bold uppercase tracking-wider text-text-muted">{title}</h2>
+      <div className="flex flex-col divide-y divide-border overflow-hidden rounded-2xl border-2 border-border bg-card shadow-sm">
+        {children}
       </div>
+    </section>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 p-4">
+      <span className="font-bold text-text">{label}</span>
+      <span className="min-w-0 truncate text-sm text-text-muted">{value}</span>
     </div>
   );
 }

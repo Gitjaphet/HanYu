@@ -1,134 +1,113 @@
+// app/(app)/profile/page.tsx — le profil de l'élève : ses vraies données (compte, statistiques, progression)
 "use client";
 
-import { User, Hammer, Zap, BookOpen, Award, GraduationCap, ShieldCheck, Users } from "lucide-react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { BookOpenCheck, Settings, UserPlus } from "lucide-react";
+import { useCurriculum, useLessons } from "@/hooks/useLessons";
+import { useProgressStore } from "@/store/progressStore";
+import { useUserStore } from "@/store/userStore";
+import { countDone } from "@/lib/progress";
+import { activeDays, streak, totals } from "@/lib/stats";
+import { LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
+import { StatTiles } from "@/components/dashboard/StatTiles";
+import { ActivityCalendar } from "@/components/dashboard/ActivityCalendar";
 
 export default function ProfilePage() {
+  const user = useUserStore((s) => s.user);
+  const status = useUserStore((s) => s.status);
+  const { lessons, loading, error } = useLessons();
+  const curriculum = useCurriculum();
+  const progress = useProgressStore((s) => s.progress);
+  const hydrated = useProgressStore((s) => s.hydrated);
+  const [today] = useState(() => new Date());
+  const days = useMemo(() => activeDays(progress), [progress]);
+
+  if (status === "loading" || loading || curriculum.loading || !hydrated) return <ProfileSkeleton />;
+  if (error || curriculum.error) return <LessonUnavailable error={error ?? curriculum.error} />;
+
+  const { xp, stars } = totals(progress);
+  const done = countDone(lessons, progress);
+  const levels = curriculum.data.map((level) => {
+    const own = lessons.filter((l) => l.levelId === level.code);
+    return { code: level.code, label: level.label, done: countDone(own, progress), total: own.length };
+  });
+  const pseudo = user?.pseudo ?? "Invité";
+  const since = user ? new Date(user.createdAt).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }) : null;
+
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 pb-24">
-      
-      {/* ── En-tête "En construction" ── */}
-      <div className="flex flex-col items-center text-center mb-10 bg-card p-6 sm:p-8 rounded-3xl border border-border shadow-sm">
-        
-        {/* Icône animée */}
-        <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
-          <div className="w-16 h-16 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center">
-            <User size={40} />
-          </div>
-          <div className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-md animate-bounce">
-            <Hammer size={24} className="text-secondary" />
-          </div>
+    <div className="mx-auto flex max-w-3xl flex-col gap-4 sm:gap-6">
+      {/* Identité */}
+      <section className="flex flex-col items-center gap-4 rounded-3xl border border-border bg-card p-6 text-center shadow-sm sm:flex-row sm:text-left">
+        <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-secondary text-3xl font-black text-white shadow-md">
+          {pseudo.slice(0, 2).toUpperCase()}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-2xl font-black text-text sm:text-3xl">{pseudo}</h1>
+          {user ? (
+            <>
+              <p className="truncate text-sm font-medium text-text-muted">{user.email}</p>
+              <p className="mt-1 text-xs font-bold text-text-muted first-letter:uppercase">Membre depuis {since}</p>
+            </>
+          ) : (
+            <p className="text-sm font-medium text-text-muted">Ta progression est enregistrée sur cet appareil uniquement.</p>
+          )}
         </div>
-        
-        <h1 className="text-3xl sm:text-4xl font-black text-text mb-3">
-          Espace Profil 🚧
-        </h1>
-        <p className="text-text-muted font-medium text-base sm:text-lg max-w-lg">
-          Ton espace personnel est en cours de création ! <br className="hidden sm:block" />
-          Bientôt, tu pourras y voir tes statistiques, tes badges, et l'interface s'adaptera à ton rôle (Élève ou Professeur).
-        </p>
-      </div>
+        {user ? (
+          <Link href="/settings"
+            className="flex items-center gap-2 rounded-full bg-tint px-5 py-2.5 text-sm font-extrabold text-primary transition hover:brightness-95">
+            <Settings size={16} aria-hidden="true" /> Paramètres
+          </Link>
+        ) : (
+          <Link href="/register"
+            className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-extrabold text-white transition hover:bg-primary-dark">
+            <UserPlus size={16} aria-hidden="true" /> Créer un compte
+          </Link>
+        )}
+      </section>
 
-      {/* ── Aperçu des profils (Flouté/Grisé) ── */}
-      <div className="opacity-50 select-none pointer-events-none grayscale-[40%] transition-all flex flex-col gap-8">
-        
-        {/* 1. APERÇU PROFIL ÉLÈVE */}
-        <div>
-          <h2 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-4 ml-2 flex items-center gap-2">
-            <GraduationCap size={16} /> Vue : Étudiant / Apprenant
-          </h2>
-          
-          <div className="bg-card border-2 border-border rounded-3xl p-6 shadow-sm">
-            {/* Header Profil */}
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 mb-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-md">
-                AL
-              </div>
-              <div className="text-center sm:text-left flex-1">
-                <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
-                  <h3 className="text-2xl font-black text-text">Alexandre L.</h3>
-                  <span className="bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md flex items-center gap-1">
-                    <GraduationCap size={12} /> Élève
-                  </span>
-                </div>
-                <p className="text-sm text-text-muted font-medium">Niveau A · Initiation</p>
-                <p className="text-xs text-text-muted mt-2">Membre depuis Janvier 2024</p>
-              </div>
-            </div>
+      <StatTiles streak={streak(days, today)} xp={xp} stars={stars} />
 
-            {/* Stats Élève */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
-              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-center">
-                <Zap size={20} className="text-orange-500 mx-auto mb-1" />
-                <p className="font-black text-orange-600 text-lg">12</p>
-                <p className="text-[10px] font-bold text-orange-700/70 uppercase">Jours de suite</p>
-              </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
-                <Award size={20} className="text-blue-500 mx-auto mb-1" />
-                <p className="font-black text-blue-600 text-lg">2 450</p>
-                <p className="text-[10px] font-bold text-blue-700/70 uppercase">XP Total</p>
-              </div>
-              <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
-                <BookOpen size={20} className="text-green-500 mx-auto mb-1" />
-                <p className="font-black text-green-600 text-lg">8</p>
-                <p className="text-[10px] font-bold text-green-700/70 uppercase">Leçons finies</p>
-              </div>
-            </div>
-          </div>
+      {/* Progression par niveau */}
+      <section aria-labelledby="levels-title" className="rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 id="levels-title" className="font-black text-text">Ma progression</h2>
+          <span className="flex items-center gap-1.5 text-sm font-bold text-text-muted">
+            <BookOpenCheck size={16} className="text-success" aria-hidden="true" />
+            {done} leçon{done > 1 ? "s" : ""} terminée{done > 1 ? "s" : ""}
+          </span>
         </div>
+        <ul className="flex flex-col gap-4">
+          {levels.map((level) => {
+            const percent = level.total ? Math.round((level.done / level.total) * 100) : 0;
+            return (
+              <li key={level.code}>
+                <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
+                  <span className="font-bold text-text">Niveau {level.code} · {level.label}</span>
+                  <span className="shrink-0 font-bold tabular-nums text-text-muted">{level.done} / {level.total}</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-border" role="progressbar"
+                  aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label={`Niveau ${level.code}`}>
+                  <div className={`h-full rounded-full transition-all duration-500 ${percent === 100 ? "bg-success" : "bg-primary"}`}
+                    style={{ width: `${percent}%` }} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
-        {/* 2. APERÇU PROFIL PROFESSEUR */}
-        <div>
-          <h2 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-4 ml-2 flex items-center gap-2">
-            <ShieldCheck size={16} /> Vue : Professeur / Administrateur
-          </h2>
-          
-          <div className="bg-card border-2 border-purple-200 rounded-3xl p-6 shadow-sm">
-            {/* Header Profil Prof */}
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 mb-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-md">
-                HW
-              </div>
-              <div className="text-center sm:text-left flex-1">
-                <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
-                  <h3 className="text-2xl font-black text-text">Mme. Wang</h3>
-                  <span className="bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md flex items-center gap-1">
-                    <ShieldCheck size={12} /> Professeur
-                  </span>
-                </div>
-                <p className="text-sm text-text-muted font-medium">Département de Mandarin</p>
-              </div>
-              <div className="hidden sm:block">
-                <button className="bg-purple-600 text-white font-bold text-sm px-4 py-2 rounded-xl">
-                  Gérer les classes
-                </button>
-              </div>
-            </div>
+      <ActivityCalendar days={days} today={today} />
+    </div>
+  );
+}
 
-            {/* Stats Professeur */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex items-center gap-4">
-                <div className="bg-purple-200 text-purple-700 p-3 rounded-lg">
-                  <Users size={24} />
-                </div>
-                <div>
-                  <p className="font-black text-purple-700 text-xl">42</p>
-                  <p className="text-[10px] font-bold text-purple-600 uppercase">Élèves suivis</p>
-                </div>
-              </div>
-              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center gap-4">
-                <div className="bg-indigo-200 text-indigo-700 p-3 rounded-lg">
-                  <BookOpen size={24} />
-                </div>
-                <div>
-                  <p className="font-black text-indigo-700 text-xl">3</p>
-                  <p className="text-[10px] font-bold text-indigo-600 uppercase">Classes actives</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
+function ProfileSkeleton() {
+  return (
+    <div className="mx-auto flex max-w-3xl animate-pulse flex-col gap-4 sm:gap-6" aria-busy="true" aria-label="Chargement du profil">
+      <div className="h-36 rounded-3xl bg-card" />
+      <div className="h-24 rounded-3xl bg-card" />
+      <div className="h-48 rounded-3xl bg-card" />
     </div>
   );
 }

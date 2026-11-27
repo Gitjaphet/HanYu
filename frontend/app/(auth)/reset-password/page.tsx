@@ -98,7 +98,7 @@ export default function ResetPasswordPage() {
         <AuthField id="confirm" name="confirm" type="password" label="Confirme le mot de passe"
           autoComplete="new-password" minLength={MIN_LENGTH} maxLength={128} required />
 
-        {error && <p role="alert" className="text-sm font-bold text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p role="alert" className="text-sm font-bold text-danger">{error}</p>}
 
         <button type="submit" disabled={pending}
           className="w-full rounded-xl bg-primary py-3.5 font-bold text-white shadow-md transition hover:bg-primary-dark disabled:opacity-60">

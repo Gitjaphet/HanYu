@@ -56,7 +56,7 @@ jobs:
 
   # ── 2. Tests du frontend ──
   frontend:
-    name: Frontend (TypeScript + Vitest)
+    name: Frontend (TypeScript + ESLint + Vitest)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -71,6 +71,8 @@ jobs:
       - run: npm ci
       - name: TypeScript
         run: npx tsc --noEmit
+      - name: ESLint (aucune erreur ni avertissement toléré)
+        run: npm run lint
       - name: Tests
         run: npm test
 
