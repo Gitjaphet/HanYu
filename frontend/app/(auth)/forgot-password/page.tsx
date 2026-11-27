@@ -65,7 +65,7 @@ export default function ForgotPasswordPage() {
       <form onSubmit={onSubmit} className="space-y-5">
         <AuthField id="email" name="email" type="email" label="E-mail" autoComplete="email" required autoFocus />
 
-        {error && <p role="alert" className="text-sm font-bold text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p role="alert" className="text-sm font-bold text-danger">{error}</p>}
 
         <button type="submit" disabled={pending}
           className="w-full rounded-xl bg-primary py-3.5 font-bold text-white shadow-md transition hover:bg-primary-dark disabled:opacity-60">

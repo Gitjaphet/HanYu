@@ -36,7 +36,7 @@ export default function PandaMascot({ state, word }: Props) {
           </div>
           {word
             ? <span className={styles.bubbleWord}>{word}</span>
-            : <span style={{ color: "#6b7280" }}>répète !</span>
+            : <span className="text-text-muted">répète !</span>
           }
         </div>
       )}

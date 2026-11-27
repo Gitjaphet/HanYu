@@ -1,7 +1,7 @@
 /** Trois chiffres clés : série de jours, XP et étoiles. */
 export function StatTiles({ streak, xp, stars }: { streak: number; xp: number; stars: number }) {
   const tiles = [
-    { value: streak, label: streak > 1 ? "jours de suite" : "jour de suite", color: "text-amber-600 dark:text-amber-400" },
+    { value: streak, label: streak > 1 ? "jours de suite" : "jour de suite", color: "text-warning" },
     { value: xp, label: "XP", color: "text-primary" },
     { value: stars, label: stars > 1 ? "étoiles" : "étoile", color: "text-text" },
   ];

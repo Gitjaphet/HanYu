@@ -16,7 +16,7 @@ function Stars({ count }: { count: number }) {
           key={i}
           size={15}
           aria-hidden="true"
-          className={i < count ? "fill-amber-400 text-amber-400" : "text-border"}
+          className={i < count ? "fill-warning text-warning" : "text-border"}
         />
       ))}
     </span>
