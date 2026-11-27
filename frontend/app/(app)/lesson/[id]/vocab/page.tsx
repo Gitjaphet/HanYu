@@ -1,38 +1,18 @@
 // app/(app)/lesson/[id]/vocab/page.tsx — partie 1 : écouter chaque mot puis le répéter au micro
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, CheckCircle2, ChevronRight, Mic, MicOff, RotateCcw, Snail, Volume2 } from "lucide-react";
+import { motion } from "motion/react";
+import { ArrowLeft, ChevronRight, Mic } from "lucide-react";
 import { useLesson } from "@/hooks/useLessons";
 import { useProgressStore } from "@/store/progressStore";
 import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
 import { QuitDialog } from "@/components/lesson/QuitDialog/QuitDialog";
-import PandaMascot, { type PandaState } from "@/components/lesson/PandaMascot/PandaMascot";
-import {
-  listenOnce,
-  matchesHanzi,
-  speak,
-  speakRepeatAfterMe,
-  stopSpeaking,
-  type ListenError,
-  type Listening,
-} from "@/lib/speech";
+import { NextFooter } from "@/components/lesson/NextFooter/NextFooter";
+import { ListenButtons, RepeatPanel } from "@/components/lesson/RepeatPanel/RepeatPanel";
+import { useRepeatAfterMe } from "@/hooks/useRepeatAfterMe";
 import type { VocabItem } from "@/types";
-
-const LISTEN_TIMEOUT_MS = 15000;
-const TRIES = 3; // première écoute + 2 nouvelles tentatives
-
-type Phase = "waiting" | "speaking" | "listening" | "success" | "fail";
-
-const PANDA: Record<Phase, PandaState> = {
-  waiting: "idle",
-  speaking: "speaking",
-  listening: "listening",
-  success: "success",
-  fail: "fail",
-};
 
 export default function VocabPage() {
   const params = useParams<{ id: string }>();
@@ -139,81 +119,13 @@ type WordStepProps = {
 };
 
 function WordStep({ word, isLast, paused, onNext }: WordStepProps) {
-  const [phase, setPhase] = useState<Phase>("waiting");
-  const [attempt, setAttempt] = useState(0);
-  const [heard, setHeard] = useState("");
-  const [problem, setProblem] = useState<ListenError | null>(null);
+  const repeat = useRepeatAfterMe(word.hanzi, paused);
   const [showExample, setShowExample] = useState(false);
 
-  const runId = useRef(0); // chaque séquence a un numéro : une séquence remplacée s'arrête d'elle-même
-  const listening = useRef<Listening | null>(null);
-  const settled = useRef(false); // réussi ou abandonné : on ne relance plus tout seul
-
-  const cancel = useCallback(() => {
-    runId.current += 1;
-    listening.current?.stop();
-    stopSpeaking();
-  }, []);
-
-  /** « Répète après moi », puis écoute, jusqu'à TRIES essais. */
-  const run = useCallback(async () => {
-    const id = ++runId.current;
-    const alive = () => runId.current === id;
-    settled.current = false;
-    setProblem(null);
-    setHeard("");
-
-    for (let i = 0; i < TRIES; i++) {
-      setAttempt(i);
-      setPhase("speaking");
-      await speakRepeatAfterMe(word.hanzi);
-      if (!alive()) return;
-
-      setPhase("listening");
-      listening.current = listenOnce({ timeoutMs: LISTEN_TIMEOUT_MS });
-      const { heard: candidates, error } = await listening.current.result;
-      if (!alive() || error === "aborted") return;
-
-      if (error === "unsupported" || error === "denied") {
-        setProblem(error); // inutile de réessayer : l'élève doit agir (navigateur ou autorisation)
-        break;
-      }
-      setHeard(candidates[0] ?? "");
-      if (matchesHanzi(candidates, word.hanzi)) {
-        settled.current = true;
-        setPhase("success");
-        return;
-      }
-    }
-    settled.current = true;
-    setPhase("fail");
-  }, [word.hanzi]);
-
-  // Démarre (ou reprend) la séquence, sauf pendant la fenêtre « Quitter ? » ou une fois le mot terminé
-  useEffect(() => {
-    if (paused || settled.current) return;
-    const timer = setTimeout(run, 500);
-    return () => {
-      clearTimeout(timer);
-      cancel();
-    };
-  }, [paused, run, cancel]);
-
   const next = () => {
-    cancel();
+    repeat.cancel();
     onNext();
   };
-
-  const status =
-    problem === "unsupported" ? "Ton navigateur ne sait pas écouter. Utilise Chrome, Edge ou Safari, ou passe ce mot."
-    : problem === "denied" ? "Le micro est bloqué : autorise-le dans ton navigateur, puis réessaie."
-    : phase === "speaking" ? "Écoute bien…"
-    : phase === "listening" ? "Parle maintenant…"
-    : phase === "success" ? "Bonne prononciation !"
-    : phase === "fail" ? (heard ? `Entendu : « ${heard} »` : "Pas de réponse détectée")
-    : "Prépare-toi…";
-
-  const busy = phase === "speaking" || phase === "listening";
 
   return (
     <>
@@ -230,47 +142,10 @@ function WordStep({ word, isLast, paused, onNext }: WordStepProps) {
           </h2>
           <p className="mt-1 text-lg font-bold tracking-widest text-primary sm:text-xl">{word.pinyin}</p>
           <p className="mt-0.5 text-sm font-semibold text-text-muted sm:text-base">{word.french}</p>
-          <ListenButtons text={word.hanzi} disabled={busy} />
+          <ListenButtons text={word.hanzi} disabled={repeat.busy} />
         </motion.div>
 
-        {/* Zone micro */}
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 sm:gap-3 sm:p-5">
-          <PandaMascot state={PANDA[phase]} word={word.hanzi} />
-          <p role="status" aria-live="polite"
-            className={`text-center text-xs font-bold uppercase tracking-wider ${problem ? "text-warning" : "text-text-muted"}`}>
-            {status}
-          </p>
-          {attempt > 0 && busy && (
-            <p className="text-xs font-bold text-warning">Essai {attempt + 1} / {TRIES}</p>
-          )}
-
-          <MicButton phase={phase} onRetry={() => void run()} />
-
-          <AnimatePresence>
-            {phase === "success" && (
-              <motion.p
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="rounded-lg bg-success-soft px-3 py-1.5 text-xs font-bold text-success"
-              >
-                Parfait ! Tu peux passer au mot suivant.
-              </motion.p>
-            )}
-          </AnimatePresence>
-
-          {phase === "fail" && (
-            <div className="flex gap-2">
-              <button type="button" onClick={() => void run()}
-                className="flex items-center gap-1.5 rounded-lg bg-warning-soft px-3 py-2 text-xs font-bold text-warning transition active:scale-95">
-                <RotateCcw size={13} aria-hidden="true" /> Réessayer
-              </button>
-              <button type="button" onClick={next}
-                className="flex items-center gap-1.5 rounded-lg bg-tint px-3 py-2 text-xs font-bold text-text-muted transition hover:text-text active:scale-95">
-                Passer <ChevronRight size={13} aria-hidden="true" />
-              </button>
-            </div>
-          )}
-        </div>
+        <RepeatPanel repeat={repeat} hanzi={word.hanzi} successText="Parfait ! Tu peux passer au mot suivant." onSkip={next} />
 
         {/* Phrase d'exemple */}
         {word.example && (
@@ -290,7 +165,7 @@ function WordStep({ word, isLast, paused, onNext }: WordStepProps) {
                 <p className="font-hanzi text-base font-bold text-text sm:text-lg">{word.example.hanzi}</p>
                 <p className="text-sm font-semibold text-primary">{word.example.pinyin}</p>
                 <p className="text-sm text-text-muted">{word.example.french}</p>
-                <ListenButtons text={word.example.hanzi} disabled={busy} small />
+                <ListenButtons text={word.example.hanzi} disabled={repeat.busy} small />
               </div>
             )}
           </div>
@@ -298,68 +173,10 @@ function WordStep({ word, isLast, paused, onNext }: WordStepProps) {
       </div>
 
       {/* Pied : passer au mot suivant */}
-      <div className="border-t border-border bg-card px-3 pb-5 pt-3 sm:px-4 sm:pb-6 sm:pt-4">
-        <div className="mx-auto w-full max-w-2xl">
-          <button
-            type="button"
-            onClick={next}
-            disabled={phase === "listening"}
-            className={`w-full rounded-xl py-3.5 text-sm font-bold shadow-sm transition active:scale-[0.98] sm:py-4 sm:text-base disabled:cursor-not-allowed disabled:bg-border disabled:text-text-muted ${
-              phase === "success" ? "bg-success text-white hover:brightness-110" : "bg-secondary text-white hover:brightness-110"
-            }`}
-          >
-            {phase === "success"
-              ? isLast ? "Terminer le vocabulaire →" : "Mot suivant →"
-              : isLast ? "Terminer quand même →" : "Passer ce mot →"}
-          </button>
-        </div>
-      </div>
+      <NextFooter phase={repeat.phase} onNext={next}
+        label={repeat.phase === "success"
+          ? isLast ? "Terminer le vocabulaire →" : "Mot suivant →"
+          : isLast ? "Terminer quand même →" : "Passer ce mot →"} />
     </>
-  );
-}
-
-function ListenButtons({ text, disabled, small = false }: { text: string; disabled: boolean; small?: boolean }) {
-  const size = small ? 12 : 13;
-  const base = `flex items-center gap-1.5 rounded-lg font-bold text-xs transition active:scale-95 disabled:opacity-50 ${small ? "px-3 py-1.5" : "px-3 py-2 sm:px-4"}`;
-  return (
-    <div className={`flex items-center gap-2 ${small ? "mt-2" : "mt-2 sm:mt-3"}`}>
-      <button type="button" disabled={disabled} onClick={() => void speak(text)}
-        className={`${base} bg-primary/10 text-primary hover:bg-primary/20`}>
-        <Volume2 size={size} aria-hidden="true" /> Normal
-      </button>
-      <button type="button" disabled={disabled} onClick={() => void speak(text, true)}
-        className={`${base} bg-tint text-secondary hover:brightness-95 dark:text-primary`}>
-        <Snail size={size} aria-hidden="true" /> Lent
-      </button>
-    </div>
-  );
-}
-
-function MicButton({ phase, onRetry }: { phase: Phase; onRetry: () => void }) {
-  if (phase === "listening") {
-    // Onde qui pulse pendant l'écoute (remplace l'animation Lottie téléchargée)
-    return (
-      <span className="relative flex h-14 w-14 items-center justify-center sm:h-16 sm:w-16" aria-hidden="true">
-        <span className="absolute inset-0 animate-ping rounded-full bg-primary/30" />
-        <span className="relative flex h-full w-full items-center justify-center rounded-full bg-primary text-white shadow-md">
-          <Mic size={22} />
-        </span>
-      </span>
-    );
-  }
-  const success = phase === "success";
-  const fail = phase === "fail";
-  return (
-    <button
-      type="button"
-      onClick={onRetry}
-      disabled={success || phase === "speaking"}
-      aria-label={success ? "Mot réussi" : "Écouter et répéter de nouveau"}
-      className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-md transition sm:h-16 sm:w-16 ${
-        success ? "cursor-default bg-success" : fail ? "bg-warning hover:brightness-110 active:scale-95" : "bg-primary hover:bg-primary-dark active:scale-95"
-      }`}
-    >
-      {success ? <CheckCircle2 size={24} /> : fail ? <MicOff size={22} /> : <Mic size={22} />}
-    </button>
   );
 }

@@ -1,630 +1,301 @@
-// app/(app)/lesson/[id]/dialogue/page.tsx
+// app/(app)/lesson/[id]/dialogue/page.tsx — partie 2 : écouter tout le dialogue, puis répéter chaque réplique
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { motion } from "motion/react";
+import { ChevronLeft, ChevronRight, MessageSquare, Volume2 } from "lucide-react";
 import { useLesson } from "@/hooks/useLessons";
+import { useRepeatAfterMe } from "@/hooks/useRepeatAfterMe";
 import { useProgressStore } from "@/store/progressStore";
 import { LessonLoading, LessonUnavailable } from "@/components/lesson/LessonState/LessonState";
-import { DialogueLine } from "@/types";
-import { ChevronLeft, ChevronRight, Volume2, Mic, MicOff, RotateCcw, CheckCircle2, MessageSquare } from "lucide-react";
-import PandaMascot, { PandaState } from "@/components/lesson/PandaMascot/PandaMascot";
+import { NextFooter } from "@/components/lesson/NextFooter/NextFooter";
+import PandaMascot from "@/components/lesson/PandaMascot/PandaMascot";
+import { ListenButtons, RepeatPanel } from "@/components/lesson/RepeatPanel/RepeatPanel";
+import { speak, speakSequence, stopSpeaking } from "@/lib/speech";
+import type { DialogueLine } from "@/types";
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-const LISTEN_TIMEOUT_MS = 15000;
-const MAX_ATTEMPTS      = 2;
+type Step = "discovery" | "practice";
 
-type MicState = "idle" | "listening" | "success" | "fail";
-type Phase    = "discovery" | "practice";
+// Deux personnages, deux couleurs du thème (lisibles en clair comme en sombre)
+const SPEAKER = {
+  A: { bubble: "bg-tint border-primary/25 rounded-tl-none", accent: "text-primary", align: "items-start", justify: "justify-start" },
+  B: { bubble: "bg-tertiary/10 border-tertiary/30 rounded-tr-none", accent: "text-tertiary", align: "items-end", justify: "justify-end" },
+} as const;
+const speakerStyle = (speaker: string) => (speaker === "B" ? SPEAKER.B : SPEAKER.A);
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function DialoguePage() {
   const params = useParams<{ id: string }>();
-  const router  = useRouter();
+  const router = useRouter();
   const { lesson, loading, error } = useLesson(Number(params.id));
   const completeDialogue = useProgressStore((s) => s.completeDialogue);
 
-  const dialogue: DialogueLine[] = lesson?.dialogue ?? [];
+  const [step, setStep] = useState<Step>("discovery");
+  const [lineIdx, setLineIdx] = useState(0);
 
-  // ── Phase discovery ──
-  const [phase, setPhase]                 = useState<Phase>("discovery");
-  const [discoveryIdx, setDiscoveryIdx]   = useState(0);
-  const [discoveryDone, setDiscoveryDone] = useState(false);
+  const lines: DialogueLine[] = lesson?.dialogue ?? [];
 
-  // ── Phase practice ──
-  const [practiceIdx, setPracticeIdx] = useState(0);
-  const [micState, setMicState]       = useState<MicState>("idle");
-  const [attempts, setAttempts]       = useState(0);
-  const [heard, setHeard]             = useState("");
-
-  // ── Panda ──
-  const [pandaState, setPandaState] = useState<PandaState>("idle");
-
-  const timeoutRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const recognRef    = useRef<any>(null);
-  const hasAutoRef   = useRef(false);
-  const cancelledRef = useRef(false);
-
-  const currentLine = dialogue[practiceIdx];
-  const progress    = phase === "discovery"
-    ? (discoveryIdx / dialogue.length) * 50
-    : 50 + (practiceIdx / dialogue.length) * 50;
-
-  // ─── Sync pandaState ← micState (phase practice) ─────────────────────────
-  useEffect(() => {
-    if (phase !== "practice") return;
-    if (micState === "listening") setPandaState("listening");
-    else if (micState === "success") setPandaState("success");
-    else if (micState === "fail")    setPandaState("fail");
-    else setPandaState("idle");
-  }, [micState, phase]);
-
-  // ─── TTS ──────────────────────────────────────────────────────────────────
-  const speak = useCallback((text: string, lang: string, slow = false): Promise<void> => {
-    return new Promise((resolve) => {
-      if (typeof window === "undefined" || !window.speechSynthesis) { resolve(); return; }
-      window.speechSynthesis.cancel();
-      const u   = new SpeechSynthesisUtterance(text);
-      u.lang    = lang;
-      u.rate    = slow ? 0.55 : 0.9;
-      u.onend   = () => resolve();
-      u.onerror = () => resolve();
-      window.speechSynthesis.speak(u);
-    });
-  }, []);
-
-  const speakWithPanda = useCallback((text: string, lang: string, slow = false): Promise<void> => {
-    return new Promise((resolve) => {
-      if (typeof window === "undefined" || !window.speechSynthesis) { resolve(); return; }
-      window.speechSynthesis.cancel();
-      setPandaState("speaking");
-      const u   = new SpeechSynthesisUtterance(text);
-      u.lang    = lang;
-      u.rate    = slow ? 0.55 : 0.9;
-      u.onend   = () => { setPandaState("idle"); resolve(); };
-      u.onerror = () => { setPandaState("idle"); resolve(); };
-      window.speechSynthesis.speak(u);
-    });
-  }, []);
-
-  const speakInstruction = useCallback((hanzi: string): Promise<void> => {
-    return new Promise((resolve) => {
-      if (typeof window === "undefined" || !window.speechSynthesis) { resolve(); return; }
-      window.speechSynthesis.cancel();
-      setPandaState("speaking");
-      const intro  = new SpeechSynthesisUtterance("Répète après moi :");
-      intro.lang   = "fr-FR";
-      intro.rate   = 1;
-      const word   = new SpeechSynthesisUtterance(hanzi);
-      word.lang    = "zh-CN";
-      word.rate    = 0.85;
-      word.onend   = () => { setPandaState("idle"); resolve(); };
-      word.onerror = () => { setPandaState("idle"); resolve(); };
-      intro.onend  = () => window.speechSynthesis.speak(word);
-      window.speechSynthesis.speak(intro);
-    });
-  }, []);
-
-  // ─── Micro ────────────────────────────────────────────────────────────────
-  const stopListening = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    try { recognRef.current?.stop(); } catch (_) {}
-    recognRef.current = null;
-  }, []);
-
-  const startListening = useCallback((expectedHanzi: string, attemptNum: number) => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-
-    stopListening();
-    setMicState("listening");
-
-    const rec           = new SR();
-    rec.lang            = "zh-CN";
-    rec.interimResults  = false;
-    rec.maxAlternatives = 3;
-    recognRef.current   = rec;
-
-    timeoutRef.current = setTimeout(async () => {
-      stopListening();
-      if (attemptNum < MAX_ATTEMPTS) {
-        setAttempts((a) => a + 1);
-        setMicState("idle");
-        await speakInstruction(expectedHanzi);
-        if (!cancelledRef.current) startListening(expectedHanzi, attemptNum + 1);
-      } else {
-        setMicState("fail");
-        setHeard("");
-      }
-    }, LISTEN_TIMEOUT_MS);
-
-    rec.onresult = (e: any) => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      stopListening();
-      const results: string[] = [];
-      for (let i = 0; i < e.results[0].length; i++) results.push(e.results[0][i].transcript);
-      const top   = results[0];
-      setHeard(top);
-      const clean = (s: string) => s.replace(/[\s，。！？、]/g, "");
-      const ok    = results.some((r) => clean(r) === clean(expectedHanzi));
-      if (ok) {
-        setMicState("success");
-      } else if (attemptNum < MAX_ATTEMPTS) {
-        setAttempts((a) => a + 1);
-        setMicState("idle");
-        setTimeout(async () => {
-          if (cancelledRef.current) return;
-          await speakInstruction(expectedHanzi);
-          if (!cancelledRef.current) startListening(expectedHanzi, attemptNum + 1);
-        }, 600);
-      } else {
-        setMicState("fail");
-      }
-    };
-
-    rec.onerror = () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      setMicState("fail");
-    };
-
-    rec.start();
-  }, [speakInstruction, stopListening]);
-
-  // ─── PHASE DISCOVERY ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (phase !== "discovery") return;
-    cancelledRef.current = false;
-    setPandaState("idle");
-
-    const lines = dialogue;
-    if (lines.length === 0) return;
-
-    (async () => {
-      await new Promise((r) => setTimeout(r, 400));
-      if (cancelledRef.current) return;
-
-      await speakWithPanda("Écoute bien ce dialogue.", "fr-FR");
-      if (cancelledRef.current) return;
-
-      for (let i = 0; i < lines.length; i++) {
-        if (cancelledRef.current) return;
-        setDiscoveryIdx(i);
-
-        const who = lines[i].speaker === "A" ? "Personnage A :" : "Personnage B :";
-        await speakWithPanda(who, "fr-FR");
-        if (cancelledRef.current) return;
-
-        await speakWithPanda(lines[i].hanzi, "zh-CN");
-        if (cancelledRef.current) return;
-
-        await new Promise((r) => setTimeout(r, 700));
-      }
-
-      if (cancelledRef.current) return;
-      setDiscoveryDone(true);
-      setPandaState("success");
-      setTimeout(() => setPandaState("idle"), 2000);
-    })();
-
-    return () => { cancelledRef.current = true; window.speechSynthesis?.cancel(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, dialogue.length]);
-
-  // ─── PHASE PRACTICE ───────────────────────────────────────────────────────
-  useEffect(() => {
-    if (phase !== "practice" || !currentLine) return;
-    cancelledRef.current = false;
-    hasAutoRef.current   = false;
-
-    setMicState("idle");
-    setAttempts(0);
-    setHeard("");
-    setPandaState("idle");
-
-    (async () => {
-      await new Promise((r) => setTimeout(r, 400));
-      if (cancelledRef.current || hasAutoRef.current) return;
-      hasAutoRef.current = true;
-
-      await speakInstruction(currentLine.hanzi);
-      if (cancelledRef.current) return;
-
-      startListening(currentLine.hanzi, 0);
-    })();
-
-    return () => {
-      cancelledRef.current = true;
-      stopListening();
-      window.speechSynthesis?.cancel();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, practiceIdx]);
-
-  // ─── Navigation practice ──────────────────────────────────────────────────
   const goNextLine = useCallback(() => {
-    stopListening();
-    window.speechSynthesis?.cancel();
-    cancelledRef.current = true;
-
-    const isLast = practiceIdx === dialogue.length - 1;
-    if (isLast) {
-      if (lesson) completeDialogue(lesson.id);
-      router.push(`/lesson/${lesson?.id}/quiz`);
+    if (!lesson) return;
+    if (lineIdx < lines.length - 1) {
+      setLineIdx((i) => i + 1);
     } else {
-      cancelledRef.current = false;
-      setPracticeIdx((i) => i + 1);
+      completeDialogue(lesson.id);
+      router.push(`/lesson/${lesson.id}/quiz`);
     }
-  }, [practiceIdx, dialogue.length, lesson, completeDialogue, router, stopListening]);
+  }, [lineIdx, lines.length, lesson, completeDialogue, router]);
 
-  const handleRetry = useCallback(async () => {
-    setAttempts(0);
-    setMicState("idle");
-    setHeard("");
-    cancelledRef.current = false;
-    await speakInstruction(currentLine.hanzi);
-    startListening(currentLine.hanzi, 0);
-  }, [currentLine, speakInstruction, startListening]);
-
-  // ─── Garde ────────────────────────────────────────────────────────────────
   if (loading) return <LessonLoading />;
-  if (!lesson || dialogue.length === 0) {
-    return <LessonUnavailable error={error} />;
-  }
+  if (!lesson || lines.length === 0) return <LessonUnavailable error={error} />;
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // ── RENDU PHASE DISCOVERY ─────────────────────────────────────────────────
-  // ═══════════════════════════════════════════════════════════════════════════
-  if (phase === "discovery") {
-    return (
-      <div className="fixed inset-0 bg-background z-[90] flex flex-col h-[100dvh] select-none">
-
-        {/* Header discovery :  ←vocab  [progress]  →practice (si done) */}
-        <div className="max-w-2xl w-full mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-3 sm:gap-4">
-
-          {/* ← Retour vers la page vocabulaire */}
-          <button
-            onClick={() => {
-              cancelledRef.current = true;
-              window.speechSynthesis?.cancel();
-              router.push(`/lesson/${lesson.id}/vocab`);
-            }}
-            className="text-text-muted hover:text-text transition p-2 -ml-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
-          >
-            <ChevronLeft size={20} />
-          </button>
-
-          {/* Barre de progression */}
-          <div className="flex-1 h-2 sm:h-2.5 bg-border rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-
-          {/* Label + → vers practice (visible uniquement quand discovery terminée) */}
-          {discoveryDone ? (
-            <button
-              onClick={() => {
-                cancelledRef.current = true;
-                window.speechSynthesis?.cancel();
-                setPandaState("idle");
-                setPhase("practice");
-              }}
-              className="text-text-muted hover:text-text transition p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
-            >
-              <ChevronRight size={20} />
-            </button>
-          ) : (
-            <span className="text-[11px] sm:text-xs font-bold text-text-muted whitespace-nowrap">
-              <span className="hidden sm:inline">Partie 2 · </span>Dialogue
-            </span>
-          )}
-        </div>
-
-        {/* Label */}
-        <div className="max-w-2xl w-full mx-auto px-3 sm:px-4 mb-1 sm:mb-2">
-          <span className="text-[9px] sm:text-[10px] uppercase tracking-widest font-bold text-primary/70">
-            Écoute d'abord —{" "}
-            <span className="hidden sm:inline">{lesson.title}</span>
-            <span className="inline sm:hidden">{lesson.title.length > 20 ? lesson.title.slice(0, 20) + "…" : lesson.title}</span>
-          </span>
-        </div>
-
-        {/* Panda */}
-        <div className="max-w-2xl w-full mx-auto px-3 sm:px-4 mb-1 sm:mb-2 flex justify-center">
-          <div className="scale-75 sm:scale-90 md:scale-100 origin-top">
-            <PandaMascot
-              state={pandaState}
-              word={discoveryDone ? undefined : dialogue[discoveryIdx]?.hanzi}
-            />
-          </div>
-        </div>
-
-        {/* Bulles dialogue */}
-        <div className="flex-1 max-w-2xl w-full mx-auto px-3 sm:px-4 flex flex-col justify-start gap-2 sm:gap-3 overflow-y-auto pb-4">
-          {dialogue.map((line, i) => {
-            const isActive = i === discoveryIdx;
-            const isPast   = i < discoveryIdx || discoveryDone;
-            const isFuture = !isActive && !isPast;
-
-            return (
-              <div
-                key={line.id}
-                className={`flex flex-col gap-0.5 sm:gap-1 transition-all duration-300
-                  ${line.speaker === "B" ? "items-end" : "items-start"}
-                  ${isFuture ? "opacity-30" : "opacity-100"}
-                `}
-              >
-                <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-1
-                  ${line.speaker === "A" ? "text-blue-400" : "text-green-500"}`}>
-                  <span className="inline sm:hidden">Perso {line.speaker}</span>
-                  <span className="hidden sm:inline">Personnage {line.speaker}</span>
-                </span>
-
-                <div className={`max-w-[90%] sm:max-w-[85%] px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl border-2 transition-all duration-300
-                  ${line.speaker === "A"
-                    ? "rounded-tl-none bg-blue-50 border-blue-100"
-                    : "rounded-tr-none bg-green-50 border-green-100"
-                  }
-                  ${isActive ? "shadow-md scale-[1.02]" : "scale-100"}
-                `}>
-                  <p
-                    className="text-xl sm:text-2xl font-black text-text leading-snug"
-                    style={{ fontFamily: "'Noto Serif SC', serif" }}
-                  >
-                    {line.hanzi}
-                  </p>
-                  <p className={`text-xs sm:text-sm font-semibold mt-0.5 sm:mt-1
-                    ${line.speaker === "A" ? "text-blue-500" : "text-green-600"}`}>
-                    {line.pinyin}
-                  </p>
-                  <p className="text-[11px] sm:text-xs text-text-muted mt-0.5">{line.french}</p>
-
-                  {(isActive || isPast) && (
-                    <button
-                      onClick={() => speakWithPanda(line.hanzi, "zh-CN")}
-                      className="mt-1.5 sm:mt-2 flex items-center gap-1 text-[11px] font-bold text-text-muted hover:text-text transition min-h-[36px]"
-                    >
-                      <Volume2 size={12} /> Réécouter
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-border bg-card px-3 sm:px-4 pt-3 sm:pt-4 pb-[env(safe-area-inset-bottom,16px)] sm:pb-6">
-          <div className="max-w-2xl w-full mx-auto">
-            <button
-              onClick={() => {
-                cancelledRef.current = true;
-                window.speechSynthesis?.cancel();
-                setPandaState("idle");
-                setPhase("practice");
-              }}
-              disabled={!discoveryDone}
-              className={`w-full py-3.5 sm:py-4 rounded-xl font-bold text-sm sm:text-base transition-all shadow-sm
-                ${discoveryDone
-                  ? "bg-primary text-white hover:opacity-90 active:scale-[0.98]"
-                  : "bg-border text-text-muted cursor-not-allowed"
-                }
-              `}
-            >
-              {discoveryDone ? "C'est parti, à toi de répéter ! →" : "Écoute le dialogue…"}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // ── RENDU PHASE PRACTICE ──────────────────────────────────────────────────
-  // ═══════════════════════════════════════════════════════════════════════════
-  const isLastLine = practiceIdx === dialogue.length - 1;
+  const progress = step === "discovery" ? 0 : 50 + (lineIdx / lines.length) * 50;
 
   return (
-    <div className="fixed inset-0 bg-background z-[90] flex flex-col h-[100dvh] select-none">
-
-      {/* Header practice : ←discovery  [progress]  compteur  →quiz */}
-      <div className="max-w-2xl w-full mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-3 sm:gap-4">
-
-        {/* ← Retour vers discovery */}
-        <button
-          onClick={() => {
-            stopListening();
-            window.speechSynthesis?.cancel();
-            cancelledRef.current = true;
-            setPhase("discovery");
-          }}
-          className="text-text-muted hover:text-text transition p-2 -ml-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
-        >
-          <ChevronLeft size={20} />
-        </button>
-
-        {/* Barre de progression */}
-        <div className="flex-1 h-2 sm:h-2.5 bg-border rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary rounded-full transition-all duration-500"
-            style={{ width: `${progress}%` }}
+    <div className="fixed inset-0 z-[90] flex h-[100dvh] flex-col bg-background select-none">
+      {step === "discovery" ? (
+        <Discovery
+          lines={lines}
+          title={lesson.title}
+          onBack={() => router.push(`/lesson/${lesson.id}/vocab`)}
+          onDone={() => setStep("practice")}
+        />
+      ) : (
+        <>
+          <Header
+            progress={progress}
+            backLabel="Réécouter le dialogue"
+            onBack={() => {
+              stopSpeaking();
+              setLineIdx(0);
+              setStep("discovery");
+            }}
+            forwardLabel="Aller au quiz"
+            onForward={() => {
+              stopSpeaking();
+              router.push(`/lesson/${lesson.id}/quiz`);
+            }}
+            counter={`${lineIdx + 1} / ${lines.length}`}
           />
+          <PartLabel text={`Partie 2 · Répète chaque réplique — ${lesson.title}`} />
+          <LineStep
+            key={lineIdx}
+            line={lines[lineIdx]}
+            previous={lines.slice(Math.max(0, lineIdx - 2), lineIdx)}
+            isLast={lineIdx === lines.length - 1}
+            onNext={goNextLine}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Découverte : le panda lit tout le dialogue, réplique par réplique ──
+
+function Discovery({ lines, title, onBack, onDone }: {
+  lines: DialogueLine[];
+  title: string;
+  onBack: () => void;
+  onDone: () => void;
+}) {
+  const [active, setActive] = useState(-1); // réplique en cours de lecture (-1 : introduction)
+  const [speaking, setSpeaking] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await wait(400);
+      if (cancelled) return;
+      setSpeaking(true);
+      await speakSequence([{ text: "Écoute bien ce dialogue.", lang: "fr-FR", rate: 1 }]);
+      for (let i = 0; i < lines.length; i++) {
+        if (cancelled) return;
+        setActive(i);
+        await speakSequence([
+          { text: `Personnage ${lines[i].speaker} :`, lang: "fr-FR", rate: 1 },
+          { text: lines[i].hanzi },
+        ]);
+        if (cancelled) return;
+        await wait(700);
+      }
+      if (cancelled) return;
+      setSpeaking(false);
+      setDone(true);
+    })();
+    return () => {
+      cancelled = true;
+      stopSpeaking();
+    };
+  }, [lines]);
+
+  const skip = () => {
+    stopSpeaking();
+    onDone();
+  };
+
+  return (
+    <>
+      <Header
+        progress={done ? 50 : (Math.max(active, 0) / lines.length) * 50}
+        backLabel="Revenir au vocabulaire"
+        onBack={() => {
+          stopSpeaking();
+          onBack();
+        }}
+        forwardLabel={done ? "Passer à la répétition" : undefined}
+        onForward={done ? skip : undefined}
+        counter="Dialogue"
+      />
+      <PartLabel text={`Partie 2 · Écoute d'abord — ${title}`} />
+
+      <div className="mx-auto mb-1 flex w-full max-w-2xl justify-center px-3 sm:mb-2 sm:px-4">
+        <div className="origin-top scale-75 sm:scale-90 md:scale-100">
+          <PandaMascot state={done ? "success" : speaking ? "speaking" : "idle"} word={done ? undefined : lines[active]?.hanzi} />
         </div>
-
-        {/* Compteur de répliques */}
-        <span className="text-[11px] sm:text-xs font-bold text-text-muted whitespace-nowrap tabular-nums">
-          {practiceIdx + 1} / {dialogue.length}
-        </span>
-
-        {/* → Avancer vers le quiz */}
-        <button
-          onClick={() => {
-            stopListening();
-            window.speechSynthesis?.cancel();
-            router.push(`/lesson/${lesson.id}/quiz`);
-          }}
-          className="text-text-muted hover:text-text transition p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
-        >
-          <ChevronRight size={20} />
-        </button>
       </div>
 
-      {/* Label */}
-      <div className="max-w-2xl w-full mx-auto px-3 sm:px-4 mb-1 sm:mb-2">
-        <span className="text-[9px] sm:text-[10px] uppercase tracking-widest font-bold text-primary/70">
-          <span className="hidden sm:inline">Partie 2 · Répète chaque réplique — {lesson.title}</span>
-          <span className="inline sm:hidden">Répète — {lesson.title.length > 18 ? lesson.title.slice(0, 18) + "…" : lesson.title}</span>
-        </span>
-      </div>
-
-      {/* Zone centrale */}
-      <div className="flex-1 max-w-2xl w-full mx-auto px-3 sm:px-4 flex flex-col justify-start sm:justify-center gap-3 sm:gap-4 overflow-y-auto pb-4">
-
-        {/* Lignes passées */}
-        {practiceIdx > 0 && (
-          <div className="flex flex-col gap-1.5 sm:gap-2 opacity-40">
-            {dialogue.slice(Math.max(0, practiceIdx - 2), practiceIdx).map((line) => (
-              <div key={line.id}
-                   className={`flex ${line.speaker === "B" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] sm:max-w-[75%] px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-sm border
-                  ${line.speaker === "A"
-                    ? "bg-blue-50 border-blue-100 rounded-tl-none"
-                    : "bg-green-50 border-green-100 rounded-tr-none text-right"
-                  }`}>
-                  <p
-                    className="font-bold text-text text-sm sm:text-base"
-                    style={{ fontFamily: "'Noto Serif SC', serif" }}
-                  >
-                    {line.hanzi}
-                  </p>
-                  <p className="text-[10px] sm:text-xs text-text-muted">{line.french}</p>
-                </div>
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-2 overflow-y-auto px-3 pb-4 sm:gap-3 sm:px-4">
+        {lines.map((line, i) => {
+          const style = speakerStyle(line.speaker);
+          const heardAlready = done || i <= active;
+          return (
+            <div key={line.id}
+              className={`flex flex-col gap-0.5 transition-all duration-300 sm:gap-1 ${style.align} ${heardAlready ? "opacity-100" : "opacity-30"}`}>
+              <span className={`px-1 text-[10px] font-bold uppercase tracking-wider ${style.accent}`}>
+                Personnage {line.speaker}
+              </span>
+              <div className={`max-w-[90%] rounded-2xl border-2 px-3 py-2.5 transition-all duration-300 sm:max-w-[85%] sm:px-4 sm:py-3 ${style.bubble} ${
+                i === active && !done ? "scale-[1.02] shadow-md" : ""}`}>
+                <p className="font-hanzi text-xl font-black leading-snug text-text sm:text-2xl">{line.hanzi}</p>
+                <p className={`mt-0.5 text-xs font-semibold sm:mt-1 sm:text-sm ${style.accent}`}>{line.pinyin}</p>
+                <p className="mt-0.5 text-[11px] text-text-muted sm:text-xs">{line.french}</p>
+                {done && (
+                  <button type="button" onClick={() => void speak(line.hanzi)}
+                    className="mt-1.5 flex min-h-9 items-center gap-1 text-[11px] font-bold text-text-muted transition hover:text-text sm:mt-2">
+                    <Volume2 size={12} aria-hidden="true" /> Réécouter
+                  </button>
+                )}
               </div>
-            ))}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="border-t border-border bg-card px-3 pb-[max(env(safe-area-inset-bottom),1.25rem)] pt-3 sm:px-4 sm:pb-6 sm:pt-4">
+        <div className="mx-auto w-full max-w-2xl">
+          <button
+            type="button"
+            onClick={skip}
+            disabled={!done}
+            className="w-full rounded-xl bg-primary py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-primary-dark active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-border disabled:text-text-muted sm:py-4 sm:text-base"
+          >
+            {done ? "C'est parti, à toi de répéter ! →" : "Écoute le dialogue…"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Répétition : une réplique à la fois, au micro ──
+
+function LineStep({ line, previous, isLast, onNext }: {
+  line: DialogueLine;
+  previous: DialogueLine[];
+  isLast: boolean;
+  onNext: () => void;
+}) {
+  const repeat = useRepeatAfterMe(line.hanzi);
+  const style = speakerStyle(line.speaker);
+
+  const next = () => {
+    repeat.cancel();
+    onNext();
+  };
+
+  return (
+    <>
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-start gap-3 overflow-y-auto px-3 pb-4 sm:justify-center sm:gap-4 sm:px-4">
+        {/* Les deux répliques précédentes, en rappel */}
+        {previous.length > 0 && (
+          <div className="flex flex-col gap-1.5 opacity-50 sm:gap-2">
+            {previous.map((p) => {
+              const ps = speakerStyle(p.speaker);
+              return (
+                <div key={p.id} className={`flex ${ps.justify}`}>
+                  <div className={`max-w-[80%] rounded-xl border px-3 py-1.5 sm:max-w-[75%] sm:py-2 ${ps.bubble}`}>
+                    <p className="font-hanzi text-sm font-bold text-text sm:text-base">{p.hanzi}</p>
+                    <p className="text-[10px] text-text-muted sm:text-xs">{p.french}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {/* Bulle active */}
-        <div className={`flex ${currentLine.speaker === "B" ? "justify-end" : "justify-start"}`}>
-          <div className={`max-w-[92%] sm:max-w-[85%] px-4 sm:px-5 py-3 sm:py-4 rounded-2xl border-2 shadow-md
-            ${currentLine.speaker === "A"
-              ? "bg-blue-50 border-blue-200 rounded-tl-none"
-              : "bg-green-50 border-green-200 rounded-tr-none"
-            }`}>
-            <div className="flex items-center gap-1.5 mb-1.5 sm:mb-2">
-              <MessageSquare size={11} className={currentLine.speaker === "A" ? "text-blue-400" : "text-green-500"} />
-              <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider
-                ${currentLine.speaker === "A" ? "text-blue-400" : "text-green-500"}`}>
-                <span className="hidden sm:inline">Personnage </span>Perso {currentLine.speaker}
-              </span>
+        {/* Réplique à répéter */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+          className={`flex ${style.justify}`}>
+          <div className={`max-w-[92%] rounded-2xl border-2 px-4 py-3 shadow-md sm:max-w-[85%] sm:px-5 sm:py-4 ${style.bubble}`}>
+            <div className="mb-1.5 flex items-center gap-1.5 sm:mb-2">
+              <MessageSquare size={11} className={style.accent} aria-hidden="true" />
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${style.accent}`}>Personnage {line.speaker}</span>
             </div>
-            <p
-              className="text-3xl sm:text-4xl md:text-5xl font-black text-text leading-tight"
-              style={{ fontFamily: "'Noto Serif SC', serif" }}
-            >
-              {currentLine.hanzi}
-            </p>
-            <p className={`text-sm sm:text-base font-bold mt-1
-              ${currentLine.speaker === "A" ? "text-blue-500" : "text-green-600"}`}>
-              {currentLine.pinyin}
-            </p>
-            <p className="text-xs sm:text-sm text-text-muted mt-0.5">{currentLine.french}</p>
-            <div className="flex gap-1.5 sm:gap-2 mt-2 sm:mt-3">
-              <button
-                onClick={() => speakWithPanda(currentLine.hanzi, "zh-CN", false)}
-                className="flex items-center gap-1 bg-white/70 hover:bg-white text-text-muted font-bold text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-lg border border-border transition min-h-[36px]"
-              >
-                <Volume2 size={11} /> Normal
-              </button>
-              <button
-                onClick={() => speakWithPanda(currentLine.hanzi, "zh-CN", true)}
-                className="flex items-center gap-1 bg-white/70 hover:bg-white text-orange-600 font-bold text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-lg border border-border transition min-h-[36px]"
-              >
-                🐢 Lent
-              </button>
-            </div>
+            <p className="font-hanzi text-3xl font-black leading-tight text-text sm:text-4xl md:text-5xl">{line.hanzi}</p>
+            <p className={`mt-1 text-sm font-bold sm:text-base ${style.accent}`}>{line.pinyin}</p>
+            <p className="mt-0.5 text-xs text-text-muted sm:text-sm">{line.french}</p>
+            <ListenButtons text={line.hanzi} disabled={repeat.busy} small />
           </div>
-        </div>
+        </motion.div>
 
-        {/* Zone micro + Panda */}
-        <div className="bg-card border border-border rounded-2xl p-3 sm:p-5 flex flex-col items-center gap-2 sm:gap-3">
-          <div className="scale-75 sm:scale-90 md:scale-100 origin-top">
-            <PandaMascot state={pandaState} word={currentLine.hanzi} />
-          </div>
-          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-text-muted text-center">
-            {micState === "idle"      && attempts === 0 && "Écoute et répète cette réplique…"}
-            {micState === "idle"      && attempts >  0  && `Tentative ${attempts + 1}/${MAX_ATTEMPTS + 1} — réessaie !`}
-            {micState === "listening"                   && "🎙 Parle maintenant…"}
-            {micState === "success"                     && "✓ Bonne prononciation !"}
-            {micState === "fail"      && heard          && `Entendu : "${heard}"`}
-            {micState === "fail"      && !heard         && "Pas de réponse détectée"}
-          </p>
-          <button
-            onClick={() => { if (micState !== "listening") handleRetry(); }}
-            className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-md transition-all
-              ${micState === "listening"
-                ? "bg-red-500 text-white animate-pulse cursor-default"
-                : micState === "success"
-                ? "bg-green-500 text-white cursor-default"
-                : micState === "fail"
-                ? "bg-amber-500 text-white hover:opacity-90 active:scale-95"
-                : "bg-primary text-white hover:opacity-90 active:scale-95"
-              }
-            `}
-          >
-            {micState === "success"
-              ? <CheckCircle2 size={24} />
-              : micState === "fail"
-              ? <MicOff size={22} />
-              : <Mic size={22} />
-            }
-          </button>
-          {micState === "success" && (
-            <p className="text-green-600 text-[11px] sm:text-xs font-bold bg-green-50 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg animate-bounce text-center">
-              🎉 Parfait ! Réplique suivante.
-            </p>
-          )}
-          {micState === "fail" && (
-            <div className="flex gap-1.5 sm:gap-2">
-              <button
-                onClick={handleRetry}
-                className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 font-bold text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg transition min-h-[40px]"
-              >
-                <RotateCcw size={13} /> Réessayer
-              </button>
-              <button
-                onClick={goNextLine}
-                className="flex items-center gap-1.5 bg-border hover:bg-border/70 text-text-muted font-bold text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg transition min-h-[40px]"
-              >
-                Passer <ChevronRight size={13} />
-              </button>
-            </div>
-          )}
-        </div>
+        <RepeatPanel repeat={repeat} hanzi={line.hanzi} successText="Parfait ! Réplique suivante." onSkip={next} />
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-border bg-card px-3 sm:px-4 pt-3 sm:pt-4 pb-[max(env(safe-area-inset-bottom),16px)] sm:pb-6">
-        <div className="max-w-2xl w-full mx-auto">
-          <button
-            onClick={goNextLine}
-            disabled={micState === "listening"}
-            className={`w-full py-3.5 sm:py-4 rounded-xl font-bold text-sm sm:text-base transition-all shadow-sm
-              ${micState === "success"
-                ? "bg-green-600 text-white hover:bg-green-700 active:scale-[0.98]"
-                : micState === "listening"
-                ? "bg-border text-text-muted cursor-not-allowed"
-                : "bg-secondary text-white hover:opacity-90 active:scale-[0.98]"
-              }
-            `}
-          >
-            {micState === "success"
-              ? isLastLine ? "Terminer le dialogue →" : "Réplique suivante →"
-              : isLastLine ? "Terminer quand même →"  : "Passer cette réplique →"
-            }
-          </button>
-        </div>
+      <NextFooter phase={repeat.phase} onNext={next}
+        label={repeat.phase === "success"
+          ? isLast ? "Terminer le dialogue →" : "Réplique suivante →"
+          : isLast ? "Terminer quand même →" : "Passer cette réplique →"} />
+    </>
+  );
+}
+
+// ── En-tête et libellé communs aux deux étapes ──
+
+function Header({ progress, backLabel, onBack, forwardLabel, onForward, counter }: {
+  progress: number;
+  backLabel: string;
+  onBack: () => void;
+  forwardLabel?: string;
+  onForward?: () => void;
+  counter: string;
+}) {
+  const nav = "flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-text-muted transition hover:bg-tint hover:text-text";
+  return (
+    <div className="mx-auto flex w-full max-w-2xl items-center gap-3 px-3 py-2.5 sm:gap-4 sm:px-4 sm:py-3">
+      <button type="button" onClick={onBack} aria-label={backLabel} title={backLabel} className={`-ml-2 ${nav}`}>
+        <ChevronLeft size={20} />
+      </button>
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-border sm:h-2.5" role="progressbar"
+        aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100} aria-label="Progression">
+        <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }} />
       </div>
+      <span className="whitespace-nowrap text-[11px] font-bold text-text-muted tabular-nums sm:text-xs">{counter}</span>
+      {onForward && (
+        <button type="button" onClick={onForward} aria-label={forwardLabel} title={forwardLabel} className={nav}>
+          <ChevronRight size={20} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function PartLabel({ text }: { text: string }) {
+  return (
+    <div className="mx-auto mb-1 w-full max-w-2xl px-3 sm:mb-2 sm:px-4">
+      <span className="block truncate text-[10px] font-bold uppercase tracking-widest text-primary">{text}</span>
     </div>
   );
 }
